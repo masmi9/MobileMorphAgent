@@ -1,19 +1,17 @@
 plugins {
-    id 'com.mobilemorph.agent'
+    id 'com.android.application'
 }
 
 android {
-    namespace 'com.agent'
+    namespace 'com.mobilemorph.agent'
     compileSdk 33
 
     defaultConfig {
-        applicationId "com.agent"
+        applicationId "com.mobilemorph.agent"
         minSdk 21
         targetSdk 33
         versionCode 1
         versionName "1.0"
-
-        // Needed for DexClassLoader or reflective payloads
         multiDexEnabled true
     }
 
@@ -24,7 +22,6 @@ android {
         }
     }
 
-    // Optional if you use Java 8 features (recommended)
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
@@ -32,14 +29,9 @@ android {
 }
 
 dependencies {
-    // Standard Android dependencies
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.8.0'
-
-    // Optional for network or JSON handling
     implementation 'com.squareup.okhttp3:okhttp:4.9.3'
     implementation 'com.google.code.gson:gson:2.10.1'
-
-    // Optional: Support multidex if payloads get large
     implementation 'androidx.multidex:multidex:2.0.1'
 }

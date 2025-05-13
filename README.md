@@ -131,3 +131,20 @@ The agent will receive the command and invoke:
 ```java
 DexLoader.loadandExecute(context, "/sdcard/MobileMorphAgent/payloads/test_payload.dex");
 ```
+
+...
+
+## 👥 Credits
+
+Created by **[Your Name or Team]** — 2025
+
+Inspired by:
+- [Drozer](https://github.com/FSecureLABS/drozer)
+- [Frida](https://frida.re)
+- [Metasploit Android payloads](https://github.com/rapid7/metasploit-framework)
+
+---
+
+## 🛡️ License
+
+This project is licensed under the [MIT License](LICENSE).
