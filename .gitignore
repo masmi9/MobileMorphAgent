@@ -1,0 +1,29 @@
+# Android build files
+*.apk
+*.ap_
+*.dex
+*.class
+*.jar
+
+# Gradle
+.gradle/
+build/
+captures/
+local.properties
+
+# Android Studio
+.idea/
+*.iml
+
+# Python virtual environment
+server/venv/
+__pycache__/
+*.pyc
+
+# macOS/Linux system files
+.DS_Store
+Thumbs.db
+
+# Payload outputs
+payloads/*.dex
+out/
