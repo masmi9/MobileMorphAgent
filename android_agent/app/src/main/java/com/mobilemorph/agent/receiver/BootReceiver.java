@@ -1,6 +1,8 @@
+package src.main.java.com.mobilemorph.agent.receiver;
+
 import jdk.internal.util.xml.impl.Input;
 import jdk.javadoc.internal.doclets.toolkit.builders.AbstractBuilder.Context;
-import src.main.java.com.agent.services.CommandService;
+import src.main.java.com.mobilemorph.agent.services.CommandService;
 
 public class BootReceiver extends BroadcastReceiver {
     @Override

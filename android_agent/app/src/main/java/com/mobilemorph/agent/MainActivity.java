@@ -1,4 +1,4 @@
-package src.main.java.com.agent;
+package src.main.java.com.mobilemorph.agent;
 import android.app.Activity;
 import android.os.Bundle;
 

@@ -1,10 +1,11 @@
-package src.main.java.com.agent.services;
+package src.main.java.com.mobilemorph.agent.services;
+
 import java.security.Provider;
 import java.security.Provider.Service;
 import java.util.List;
 import java.util.Map;
 
-import src.main.java.com.agent.util.ShellExecutor;
+import src.main.java.com.mobilemorph.agent.util.ShellExecutor;
 
 public class CommandService extends Service {
     public CommandService(Provider provider, String type, String algorithm, String className, List<String> aliases,
