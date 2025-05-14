@@ -40,20 +40,33 @@
 ## Project Structure
 
 ```plaintext
-AndroidC2Agent/
+MobileMorphAgent/
 ├── android_agent/           # Android APK (agent)
-│   ├── app/src/main/java/com/agent/
-│   │   ├── services/        # CommandService.java
-│   │   ├── receiver/        # BootReceiver.java
-│   │   └── util/            # ShellExecutor.java, DexLoader.java
-│   ├── res/layout/          # activity_main.xml (minimal)
-│   └── AndroidManifest.xml
+│   ├── app/
+│   │   ├── src/main/
+│   │   |   ├── java/
+│   │   |   |   ├── com/mobilemorph/agent/
+|   |   |   |   |   ├── MainActivity.java
+│   │   |   |   |   ├── services/        # CommandService.java
+│   │   |   |   |   ├── receiver/        # BootReceiver.java
+│   │   |   |   |   └── util/            # ShellExecutor.java, DexLoader.java
+│   │   |   |   ├── res/layout           # activity_main.xml (minimal)
+|   |   |   └── AndroidManifest.xml
+|   |   └── build.gradle
+|   ├── gradle/wrapper
+|   ├── build.gradle
+|   ├── gradlew
+|   ├── gradlew.bat
+│   └── settings.gradle
+|
+├── frida_hooks/             # Optional Frida hook scripts
+│   └── bypass_ssl.js
 │
 ├── injector/                # Native binary injector (C)
 │   ├── injector.c
 │   └── Makefile
 │
-├── server/                  # Flask-based C2 backend
+├── morph_server/server/                  # Flask-based C2 backend
 │   ├── main.py
 │   └── requirements.txt
 │
@@ -62,9 +75,6 @@ AndroidC2Agent/
 │
 ├── payloads_source/         # Source .java files for payloads
 │   └── Payload.java
-│
-├── frida_hooks/             # Optional Frida hook scripts
-│   └── bypass_ssl.js
 │
 ├── scripts/                 # Helper build scripts
 │   └── build_payload.sh
