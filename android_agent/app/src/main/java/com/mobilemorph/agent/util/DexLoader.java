@@ -1,4 +1,4 @@
-package src.main.java.com.mobilemorph.agent.util;
+package com.mobilemorph.agent.util;
 
 import java.io.File;
 import java.lang.reflect.Method;

