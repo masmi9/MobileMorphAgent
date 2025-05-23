@@ -5,6 +5,7 @@ plugins {
 android {
     namespace 'com.mobilemorph.agent'
     compileSdk 33
+    buildToolsVersion "34.0.0"
 
     defaultConfig {
         applicationId "com.mobilemorph.agent"
@@ -25,6 +26,13 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            def newName = "mmagent.apk"
+            outputFileName = newName
+        }
     }
 }
 

@@ -1,6 +1,11 @@
-package src.main.java.com.mobilemorph.agent.util;
+package com.mobilemorph.agent.util;
 
-public class NeworkUtils {
+import java.net.HttpURLConnection;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+public class NetworkUtils {
     public static void addAuthHeaders(HttpURLConnection conn, String agentId, String sharedKey) throws Exception {
         String sig = hmacSha256(agentId, sharedKey);
         conn.setRequestProperty("X-Agent-ID", agentId);
