@@ -20,7 +20,7 @@ import java.net.URL;
 
 public class CommandService extends Service {
     private static final String TAG = "CommandService";
-    private static final String SERVER_URL = "https://10.0.2.2:5000"; // HTTPS support enabled
+    private static final String SERVER_URL = "https://127.0.0.1:5000"; // HTTPS support enabled
 
     private static final int START_STICKY = 0;
     private String deviceId;

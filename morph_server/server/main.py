@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, abort, send_file
+from flask import Flask, request, jsonify, abort, send_file, render_template
 from flask_cors import CORS
 import os
 import hmac, hashlib
@@ -18,6 +18,10 @@ def check_auth():
         sig = request.headers.get("X-Signature")
         if not agent_id or not sig or not verify_signature(agent_id_sig):
             abort(403)
+
+@app.route("/")
+def dashboard():
+    return render_template("index.html")
 
 @app.route("/register", methods=["POST"])
 def register():
@@ -78,4 +82,4 @@ def get_payload(filename):
     return send_file(payload_path, mimetype="application/octet-stream")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, ssl_context=("cert.pem", "key.pem"))
+    app.run(host="0.0.0.0", port=5000)
