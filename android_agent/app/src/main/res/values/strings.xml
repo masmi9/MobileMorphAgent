@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">MobileMorph Agent</string>
+    <string name="mobilemorph_agent">MobileMorph Agent</string> <!-- <- this is the missing one -->
+</resources>

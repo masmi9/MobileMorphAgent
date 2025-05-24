@@ -8,18 +8,18 @@ This roadmap outlines how to elevate MobileMorphAgent beyond the capabilities of
 
 ### ✅ Agent Improvements
 
-* [ ] Implement stealth techniques (e.g., job-scheduling, encryption at rest)
-* [ ] Use WorkManager or JobScheduler instead of `startService` to avoid foreground alerts
-* [ ] Persist agent after reboot using `BOOT_COMPLETED` + `ForegroundService`
+* [✓] Implement stealth techniques (e.g., job-scheduling, encryption at rest)
+* [✓] Use WorkManager or JobScheduler instead of `startService` to avoid foreground alerts
+* [✓] Persist agent after reboot using `BOOT_COMPLETED` + `ForegroundService`
 * [ ] Hide launcher icon programmatically post-install
-* [ ] Encrypted local storage for payloads/configs
+* [✓] Encrypted local storage for payloads/configs
 
 ### ✅ Command and Control (C2)
 
-* [ ] Migrate to WebSocket for real-time command delivery (instead of polling)
-* [ ] Use HTTPS with self-signed or Let’s Encrypt certs
-* [ ] Integrate API token authentication with rotation capability
-* [ ] Provide session view in dashboard: list of active devices, timestamps, OS info
+* [✓] Migrate to WebSocket for real-time command delivery (instead of polling)
+* [✓] Use HTTPS with self-signed or Let’s Encrypt certs
+* [✓] Integrate API token authentication with rotation capability
+* [✓] Provide session view in dashboard: list of active devices, timestamps, OS info
 * [ ] Implement upload/download file endpoints via base64 or multipart
 
 ---
