@@ -14,11 +14,13 @@ local.properties
 # Android Studio
 .idea/
 *.iml
+.codesight
 
 # Python virtual environment
 server/venv/
 __pycache__/
 *.pyc
+MMAgent
 
 # macOS/Linux system files
 .DS_Store

