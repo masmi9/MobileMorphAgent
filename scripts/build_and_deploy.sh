@@ -16,7 +16,7 @@ echo "[+] Cleaning previous builds..."
 ./gradlew clean
 
 echo "[+] Assembling debug APK..."
-./gradlew assembleDebug
+./gradlew clean assembleDebug
 
 # Ensure APK was built
 if [ ! -f "$APK_OUTPUT" ]; then

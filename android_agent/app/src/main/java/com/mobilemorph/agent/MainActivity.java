@@ -8,6 +8,7 @@ import android.os.Build;
 import android.Manifest;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import sun.net.www.protocol.jmod.Handler;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_PERMISSIONS = 100;
@@ -32,10 +33,12 @@ public class MainActivity extends Activity {
     }
 
     private void hideLauncherIcon() {
-        PackageManager p = getPackageManager();
-        ComponentName componentName = new ComponentName(this, MainActivity.class);
-        p.setComponentEnabledSetting(componentName,
-            PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-            PackageManager.DONT_KILL_APP);
+        new Handler().postDelayed() -> {
+            PackageManager p = getPackageManager();
+            ComponentName componentName = new ComponentName(this, MainActivity.class);
+            p.setComponentEnabledSetting(componentName,
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP);
+        }
     }
 }

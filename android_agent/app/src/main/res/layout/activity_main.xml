@@ -7,10 +7,35 @@
     android:background="#000000">
 
     <TextView
-        android:id="@+id/status"
-        android:text="Agent Running"
-        android:textColor="#00FF00"
-        android:textStyle="bold"
-        android:textSize="18sp"
-        android:layout_gravity="center"/>
+        android:id="@+id/appTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="MobileMorph Agent"
+        android:textSize="28sp"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="32dp" />
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:id="@+id/portText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="31415"
+            android:textColor="#AAAAAA"
+            android:textSize="16sp"
+            android:layout_marginRight="16dp"/>
+
+        <Switch
+            android:id="@+id/serverToggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textOff="OFF"
+            android:textOn="ON"
+            android:checked="false"/>
+    </LinearLayout>
 </LinearLayout>

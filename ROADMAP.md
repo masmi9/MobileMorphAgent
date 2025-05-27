@@ -8,10 +8,10 @@ This roadmap outlines how to elevate MobileMorphAgent beyond the capabilities of
 
 ### ✅ Agent Improvements
 
-* [✓] Implement stealth techniques (e.g., job-scheduling, encryption at rest)
+* [] Implement stealth techniques (e.g., job-scheduling, encryption at rest)
 * [✓] Use WorkManager or JobScheduler instead of `startService` to avoid foreground alerts
 * [✓] Persist agent after reboot using `BOOT_COMPLETED` + `ForegroundService`
-* [ ] Hide launcher icon programmatically post-install
+* [✓] Hide launcher icon programmatically post-install
 * [✓] Encrypted local storage for payloads/configs
 
 ### ✅ Command and Control (C2)
@@ -66,8 +66,8 @@ This roadmap outlines how to elevate MobileMorphAgent beyond the capabilities of
 
 ### ✅ Live Device Panel
 
-* [ ] Show real-time connected agents with device ID, manufacturer, root status
-* [ ] Enable manual command injection and output collection per device
+* [✓] Show real-time connected agents with device ID, manufacturer, root status
+* [✓] Enable manual command injection and output collection per device
 
 ### ✅ Modules Panel
 
@@ -105,3 +105,59 @@ This roadmap outlines how to elevate MobileMorphAgent beyond the capabilities of
 ---
 
 Would you like to divide this roadmap into versioned milestones or weekly sprint objectives?
+
+
+
+Top 5 Next Priorities
+1. ✅ Add Execution Support for Exploit Modules (High Priority)
+Implement modular C2 dispatch for:
+
+uri_traversal (already stubbed in main.py)
+
+Future modules like intent_injection, sql_injection, jsinterface_enum
+
+Action:
+
+Build a modules/ directory with reusable exploit templates.
+
+Add UI buttons to trigger them from the dashboard.
+
+Route responses to the command_result socket handler.
+
+
+2. 🧪 Implement Dynamic Reflection Detection
+Add Frida hooks or Java method logging to flag:
+
+DexClassLoader, loadClass, Class.forName, invoke
+
+Action:
+
+Integrate with a future Frida hook module.
+
+Add /frida_hook route to push .js scripts to devices.
+
+3. 🧠 Add Static Misconfiguration Parser (MASVS Enhancer)
+You started parsing AndroidManifest.xml—extend this.
+
+Action:
+
+Add checks for:
+
+android:sharedUserId
+
+allowBackup="true"
+
+taskAffinity != default
+
+Missing android:permission on exported components
+
+4. 🔃 Self-Updating APK or Dex Mechanism
+Add an endpoint in main.py:
+
+/check_update → tells agent if new .apk or .dex is available
+
+Agent can:
+
+Download & install the new APK silently (rooted)
+
+Or pull updated .dex for hotpatching via DexLoader

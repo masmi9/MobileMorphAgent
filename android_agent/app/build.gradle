@@ -5,7 +5,7 @@ plugins {
 android {
     namespace 'com.mobilemorph.agent'
     compileSdk 33
-    buildToolsVersion "34.0.0"
+    //buildToolsVersion "33.0.2"
 
     defaultConfig {
         applicationId "com.mobilemorph.agent"
@@ -28,12 +28,16 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 
-    applicationVariants.all { variant ->
-        variant.outputs.all { output ->
-            def newName = "mmagent.apk"
-            outputFileName = newName
+    applicationVariants.configureEach { variant ->
+        variant.outputs.configureEach { output ->
+            outputFileName = "mmagent-${variant.name}.apk"
         }
     }
+}
+
+repositories {
+    google()
+    mavenCentral()
 }
 
 dependencies {
@@ -45,4 +49,8 @@ dependencies {
     implementation "androidx.work:work-runtime:2.8.1"
     implementation "androidx.annotation:annotation:1.7.1"
     implementation 'androidx.security:security-crypto:1.1.0-alpha03'
+    implementation ('io.socket:socket.io-client:2.0.1') {
+        exclude group: 'org.json', module: 'json'
+    }
+    implementation "androidx.core:core:1.10.1"
 }
