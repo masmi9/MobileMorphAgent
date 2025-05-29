@@ -106,6 +106,7 @@
 
   <script>
     const socket = io();
+    let agentCache = {};
 
     socket.on("connect", () => {
       console.log("[✓] Connected to server via WebSocket");
@@ -149,6 +150,15 @@
         container.innerHTML += block;
       }
     });
+
+    function exportAgentsJSON() {
+      const blob = new Blob([JSON.stringify(agentCache, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "connected_agents.json";
+      a.click();
+    }
 
     socket.on("command_result", (data) => {
       const outputEl = document.getElementById(`result-${data.device_id}`);
@@ -212,8 +222,6 @@
       });
     });
 
-  </script>
-  <script>
     function sendExploit(e, deviceId, moduleName) {
       e.preventDefault();
       fetch(`/exploit/${moduleName}`, {

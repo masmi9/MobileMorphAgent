@@ -1,4 +1,4 @@
-package com.mobilemorph.agent.util;
+package com.mobilemorph.agent.utils;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 

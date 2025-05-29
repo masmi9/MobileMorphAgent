@@ -6,7 +6,7 @@ import androidx.annotation.NonNull;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
-import com.mobilemorph.agent.util.ShellExecutor;
+import com.mobilemorph.agent.utils.ShellExecutor;
 
 public class AgentWorker extends Worker {
     public AgentWorker(@NonNull Context context, @NonNull WorkerParameters params) {
