@@ -11,11 +11,14 @@ import android.Manifest;
 import android.util.Log;
 import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.Toast;
+import android.widget.Button;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import com.mobilemorph.agent.services.CommandService;
 import android.provider.Settings;
-import android.widget.Toast;
+import com.mobilemorph.agent.ReconModule;
+import com.mobilemorph.agent.services.CommandService;
+import com.mobilemorph.agent.UpdateChecker;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_PERMISSIONS = 100;

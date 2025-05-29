@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify, abort, send_file, render_template
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import os
+import re
 import json
 import time
 import base64
@@ -22,6 +23,9 @@ result_store = {}
 connected_agents = {}
 agent_sockets = {}
 agent_telemetry = {}
+
+def is_safe_filename(filename):
+    return bool(re.match(r'^[\w.\-]+$', filename))
 
 # === Auth Middleware (disabled temporarily for dev/testing) ===
 @app.before_request
@@ -86,7 +90,10 @@ def export_telemetry(device_id):
     telemetry = agent_telemetry.get(device_id)
     if not telemetry:
         return jsonify({"error": "No telemetry available"}), 404
-    filepath = os.path.join("uploads", f"{device_id}_telemetry.json")
+    os.makedirs("uploads", exist_ok=True)
+    filename = f"{device_id}_telemetry.json"
+    safe_filename = os.path.basename(filename)
+    filepath = os.path.join("uploads", safe_filename)
     os.makedirs("uploads", exist_ok=True)
     with open(filepath, "w") as f:
         json.dump(telemetry, f, indent=2)
@@ -152,6 +159,8 @@ def receive_file():
 # === Dynamic Exploit Module Execution ===
 @app.route("/exploit/<module_name>", methods=["POST"])
 def generic_exploit(module_name):
+    if not is_safe_filename(module_name):
+        return jsonify({"error": "Invalid module name"}), 400
     try:
         data = request.json
         device_id = data.get("device_id")
@@ -167,6 +176,8 @@ def generic_exploit(module_name):
 # === Payload Serving ===
 @app.route("/payloads/<filename>", methods=["GET"])
 def get_payload(filename):
+    if not is_safe_filename(filename):
+        return jsonify({"error": "Invalid module name"}), 400
     payload_path = os.path.join("payloads", filename)
     if not os.path.exists(payload_path):
         return {"error": "File not found"}, 404
@@ -223,7 +234,7 @@ def upload_base64():
     data = request.json
     filename = data.get("filename")
     filedata = data.get("date")
-    if not filename or not filedata: 
+    if not filename or not filedata or not is_safe_filename(filename): 
         return jsonify({"error": "Missing filenmae or data"}), 400
     try:
         os.makedirs("upload", exist_ok=True)
@@ -236,6 +247,8 @@ def upload_base64():
 # === Flask Base64 File Download ===
 @app.route("/download_base64/<filename>", methods=["GET"])
 def download_base64(filename):
+    if not is_safe_filename(filename):
+        return jsonify({"error": "Invalid module name"}), 400
     filepath = os.path.join("uploads", filename)
     if not os.path.exists(filepath):
         return jsonify({"error": "File not found"}), 404
@@ -261,8 +274,10 @@ def run_dyna():
         ).decode()
         return jsonify({"status": "success", "output": result})
     except subprocess.CalledProcessError as e:
+        print(f"[ERROR] run_dyna failed: {e}", file=stderr)
         return jsonify({
             "status": "error",
+            "message": "Execution failed",
             "command": e.cmd,
             "returncode": e.returncode,
             "output": e.output.decode(errors="ignore")
