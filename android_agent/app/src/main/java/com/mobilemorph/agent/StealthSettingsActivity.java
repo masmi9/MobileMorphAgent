@@ -11,24 +11,17 @@ public class StealthSettingsActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_stealth_settings);
 
-        CheckBox stealthToggle = new CheckBox(this);
-        stealthToggle.setText("Enable Stealth Mode");
+        CheckBox stealthToggle = findViewById(R.id.stealthToggle);
 
         SharedPreferences prefs = getSharedPreferences("agent", MODE_PRIVATE);
         boolean stealth = prefs.getBoolean("stealth_mode", false);
         stealthToggle.setChecked(stealth);
 
-        stealthToggle.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                prefs.edit().putBoolean("stealth_mode", isChecked).apply();
-                Toast.makeText(StealthSettingsActivity.this,
-                        "Stealth mode " + (isChecked ? "enabled" : "disabled"),
-                        Toast.LENGTH_SHORT).show();
-            }
+        stealthToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            prefs.edit().putBoolean("stealth_mode", isChecked).apply();
+            Toast.makeText(this, "Stealth mode " + (isChecked ? "enabled" : "disabled"), Toast.LENGTH_SHORT).show();
         });
-
-        setContentView(stealthToggle);
     }
 }

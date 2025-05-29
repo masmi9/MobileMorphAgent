@@ -13,10 +13,33 @@
         android:networkSecurityConfig="@xml/network_security" 
         xmlns:tools="http://schemas.android.com/tools">
 
+        <!-- Main agent logic -->
+        <activity
+            android:name=".MainActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay"/>
+
+        <!-- Stealth settings UI -->
+        <activity android:name=".StealthSettingsActivity" android:exported="true" />
+
+        <!-- Launcher alias for user-friendly entry -->
+        <activity-alias
+            android:name=".SettingsAlias"
+            android:targetActivity=".StealthSettingsActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:label="Agent Settings">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Background service and receivers -->
         <service
             android:name=".services.CommandService"
             android:exported="true"/>
-
         <receiver
             android:name=".receiver.BootReceiver"
             android:enabled="true"
@@ -25,31 +48,6 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
-
-        <activity
-            android:name=".MainActivity"
-            android:enabled="true"
-            android:exported="true"
-            android:theme="@android:style/Theme.NoDisplay">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-
-        <activity android:name=".StealthSettingsActivity" android:exported="true" />
-
-        <activity-alias
-            android:name=".SettingsAlias"
-            android:targetActivity=".StealthSettingsActivity"
-            android:enabled="true"
-            android:exported="true"
-            android:label="Agent Settings">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-        </activity-alias>
 
         <provider
             android:name="androidx.startup.InitializationProvider"
@@ -60,6 +58,5 @@
                 android:value="androidx.work.WorkManagerInitializer"
                 tools:replace="android:value" />
         </provider>
-
     </application>
 </manifest>

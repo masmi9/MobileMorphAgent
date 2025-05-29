@@ -33,6 +33,7 @@ public class CommandService extends Service {
     public void onCreate() {
         super.onCreate();
         deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        registerWithServer();
     }
 
     @Override
