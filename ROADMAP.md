@@ -20,7 +20,7 @@ This roadmap outlines how to elevate MobileMorphAgent beyond the capabilities of
 * [✓] Use HTTPS with self-signed or Let’s Encrypt certs
 * [✓] Integrate API token authentication with rotation capability
 * [✓] Provide session view in dashboard: list of active devices, timestamps, OS info
-* [ ] Implement upload/download file endpoints via base64 or multipart
+* [✓] Implement upload/download file endpoints via base64 or multipart
 
 ---
 
@@ -52,12 +52,12 @@ This roadmap outlines how to elevate MobileMorphAgent beyond the capabilities of
 
 ### ✅ Dynamic Reflection
 
-* [ ] Implement dynamic analysis hooks for Java Reflection and ClassLoader abuse
+* [✓] Implement dynamic analysis hooks for Java Reflection and ClassLoader abuse
 * [ ] Alert on usage of `loadClass`, `newInstance`, `DexClassLoader` from suspicious paths
 
 ### ✅ Frida Automation
 
-* [ ] Expose optional endpoint to send `.js` scripts to `frida-server` runtime
+* [✓] Expose optional endpoint to send `.js` scripts to `frida-server` runtime
 * [ ] Create a Frida hook manager module
 
 ---
@@ -71,7 +71,7 @@ This roadmap outlines how to elevate MobileMorphAgent beyond the capabilities of
 
 ### ✅ Modules Panel
 
-* [ ] List available modules (e.g., URI traversal, shell exec, file upload)
+* [✓] List available modules (e.g., URI traversal, shell exec, file upload)
 * [ ] Send modules as on-demand payloads
 
 ### ✅ Payload Manager
@@ -85,8 +85,8 @@ This roadmap outlines how to elevate MobileMorphAgent beyond the capabilities of
 
 ### ✅ CI/CD
 
-* [ ] Add GitHub Actions or GitLab CI pipeline to auto-build and sign agent
-* [ ] Add self-updating APK delivery mechanism (polls server for updated .apk or .dex)
+* [✓] Add GitHub Actions or GitLab CI pipeline to auto-build and sign agent
+* [✓] Add self-updating APK delivery mechanism (polls server for updated .apk or .dex)
 
 ### ✅ Play Store Readiness (for PoC only)
 
@@ -105,59 +105,3 @@ This roadmap outlines how to elevate MobileMorphAgent beyond the capabilities of
 ---
 
 Would you like to divide this roadmap into versioned milestones or weekly sprint objectives?
-
-
-
-Top 5 Next Priorities
-1. ✅ Add Execution Support for Exploit Modules (High Priority)
-Implement modular C2 dispatch for:
-
-uri_traversal (already stubbed in main.py)
-
-Future modules like intent_injection, sql_injection, jsinterface_enum
-
-Action:
-
-Build a modules/ directory with reusable exploit templates.
-
-Add UI buttons to trigger them from the dashboard.
-
-Route responses to the command_result socket handler.
-
-
-2. 🧪 Implement Dynamic Reflection Detection
-Add Frida hooks or Java method logging to flag:
-
-DexClassLoader, loadClass, Class.forName, invoke
-
-Action:
-
-Integrate with a future Frida hook module.
-
-Add /frida_hook route to push .js scripts to devices.
-
-3. 🧠 Add Static Misconfiguration Parser (MASVS Enhancer)
-You started parsing AndroidManifest.xml—extend this.
-
-Action:
-
-Add checks for:
-
-android:sharedUserId
-
-allowBackup="true"
-
-taskAffinity != default
-
-Missing android:permission on exported components
-
-4. 🔃 Self-Updating APK or Dex Mechanism
-Add an endpoint in main.py:
-
-/check_update → tells agent if new .apk or .dex is available
-
-Agent can:
-
-Download & install the new APK silently (rooted)
-
-Or pull updated .dex for hotpatching via DexLoader

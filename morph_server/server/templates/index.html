@@ -52,6 +52,44 @@
       </div>
     </div>
 
+    <!-- Run Dynamic Analysis -->
+    <div class="card shadow mt-4">
+      <div class="card-header bg-success text-white">Run Dynamic Scan</div>
+      <div class="card-body">
+        <form id="dynaForm">
+          <div class="mb-3">
+            <label for="apkPath" class="form-label">APK File Path</label>
+            <input type="text" class="form-control" id="apkPath" required />
+          </div>
+          <div class="mb-3">
+            <label for="packageName" class="form-label">Package Name</label>
+            <input type="text" class="form-control" id="packageName" required />
+          </div>
+          <button type="submit" class="btn btn-warning">Run Dynamic Analysis</button>
+        </form>
+        <div id="dynaOutput" class="mt-3"></div>
+      </div>
+    </div>
+
+    <!-- Frida Hook Loader -->
+    <div class="card shadow">
+      <div class="card-header bg-primary text-white">Frida Hook Loader</div>
+      <div class="card-body">
+        <form id="fridaForm">
+          <div class="mb-3">
+            <label for="fridaDeviceId" class="form-label">Device ID</label>
+            <input type="text" class="form-control" id="fridaDeviceId" required />
+          </div>
+          <div class="mb-3">
+            <label for="scriptName" class="form-label">Select Frida Script</label>
+            <select class="form-select" id="scriptName" required></select>
+          </div>
+          <button type="submit" class="btn btn-warning">Load Script</button>
+        </form>
+        <div id="fridaStatus" class="mt-3"></div>
+      </div>
+    </div>
+
     <!-- Output -->
     <div class="card mt-4 shadow">
       <div class="card-header bg-dark text-white">Latest Results</div>
@@ -71,6 +109,12 @@
 
     socket.on("connect", () => {
       console.log("[✓] Connected to server via WebSocket");
+      fetch("/list_frida_hooks")
+        .then(res => res.json())
+        .then(data => {
+          const dropdown = document.getElementById("scriptName");
+          dropdown.innerHTML = data.scripts.map(s => `<option value="${s}">${s}</option>`).join("");
+        });
     });
 
     // Real-time agent list update
@@ -85,14 +129,35 @@
             <p>Model: ${meta.model || 'N/A'}</p>
             <p>Rooted: ${meta.rooted ? 'Yes' : 'No'}</p>
             <p>Last Seen: ${meta.last_seen || 'Unknown'}</p>
+            <form onsubmit="sendExploit(event, '${deviceId}', 'exploit_uri_traversal')">
+              <button class="btn btn-warning btn-sm" type="submit">Run URI Traversal</button>
+            </form>
+            <form onsubmit="sendExploit(event, '${deviceId}', 'exploit_sql_injection')">
+              <button class="btn btn-danger btn-sm mt-1" type="submit">Run SQL Injection</button>
+            </form>
+            <form onsubmit="sendExploit(event, '${deviceId}', 'exploit_jsinterface_enum')">
+              <button class="btn btn-info btn-sm mt-1" type="submit">JSInterface Enum</button>
+            </form>
+            <form onsubmit="sendExploit(event, '${deviceId}', 'exploit_intent_injection')">
+              <button class="btn btn-secondary btn-sm mt-1" type="submit">Intent Injection</button>
+            </form>
+            <div class="mt-2">
+              <label class="form-label fw-bold">Latest Result:</label>
+              <pre id="result-${deviceId}" class="bg-light p-2">Waiting for result...</pre>
+            </div>
           </div>`;
         container.innerHTML += block;
       }
     });
 
     socket.on("command_result", (data) => {
-      const out = `[${data.device_id}] ${data.output}`;
-      document.getElementById("results").textContent = out;
+      const outputEl = document.getElementById(`result-${data.device_id}`);
+      const resultText = `[${data.device_id}] ${data.output}`;
+      if (outputEl) {
+        outputEl.textContent = resultText;
+      } else {
+        console.warn("Received result for unknown device:", data.device_id);
+      }
     });
 
     document.getElementById("commandForm").addEventListener("submit", function (e) {
@@ -103,6 +168,72 @@
       document.getElementById("responseMsg").innerHTML =
         `<div class='alert alert-info'>Command sent to ${deviceId}</div>`;
     });
+
+    document.getElementById("fridaForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const deviceId = document.getElementById("fridaDeviceId").value;
+      const scriptName = document.getElementById("hookScript").value;
+      fetch("/frida_hooks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ device_id: deviceId, script_name: scriptName })
+      })
+      .then(res => res.json())
+      .then(data => {
+        const statusEl = document.getElementById("fridaStatus");
+        if (data.status === "hook sent") {
+          statusEl.innerHTML = `<div class='alert alert-success'>Hook sent to ${deviceId}</div>`;
+        } else {
+          statusEl.innerHTML = `<div class='alert alert-danger'>${data.error}</div>`;
+        }
+      });
+    });
+
+    document.getElementById("dynaForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const apkPath = document.getElementById("apkPath").value;
+      const packageName = document.getElementById("packageName").value;
+      fetch("/run_dyna", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apk_path: apkPath,
+          package_name: packageName
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        const out = data.status === "success"
+          ? `<pre>${data.output}</pre>`
+          : `<div class='alert alert-danger'>Error: ${data.output}</div>`;
+        document.getElementById("dynaOutput").innerHTML = out;
+      });
+    });
+
+  </script>
+  <script>
+    function sendExploit(e, deviceId, moduleName) {
+      e.preventDefault();
+      fetch(`/exploit/${moduleName}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          device_id: deviceId,
+          package: "com.example.app" // You can dynamically retrieve the correct package per device later
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(`Exploit ${moduleName} sent to ${deviceId}.`);
+      })
+      .catch(err => {
+        alert("Error sending exploit: " + err);
+      });
+    }
   </script>
 </body>
 </html>
