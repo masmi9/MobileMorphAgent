@@ -1,10 +1,10 @@
 from pathlib import Path
 
 class APKContext:
-    def __init__(self, apk_path_str: str, package_name: str, device_id: str):
+    def __init__(self, apk_path_str: str, package_name: str):
         self.apk_path = Path(apk_path_str)
         self.package_name = package_name
-        self.device_id = device_id
+        #self.device_id = device_id
         self.decompiled_apk_dir = Path("decompiled") / package_name
         self.manifest_path = self.decompiled_apk_dir / "AndroidManifest.xml"
         self.scan_mode = "safe"

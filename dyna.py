@@ -688,9 +688,9 @@ class OWASPTestSuiteDrozer:
 '''
 
 class OWASPTestSuiteAgent:
-    def __init__(self, apk_path: str, package_name: str, device_id: str):
+    def __init__(self, apk_path: str, package_name: str):
         self.apk_ctx = APKContext(apk_path_str=apk_path, package_name=package_name)
-        self.device_id = device_id
+        #self.device_id = device_id
         self.report_data: List[Tuple[str, Union[str, Text]]] = []
         self.report_generator = ReportGenerator(package_name, self.apk_ctx.scan_mode)
         self.report_formats: List[str] = ["txt"]
@@ -830,7 +830,7 @@ def main() -> None:
     args = parser.parse_args()
     suite = OWASPTestSuiteAgent(args.apk, args.pkg)
     suite.apk_ctx.set_scan_mode(args.mode)
-    suite.set_report_formats(args.formats)
+    suite.report_formats = args.formats
     suite.full_test_suite()
 
 

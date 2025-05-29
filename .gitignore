@@ -15,6 +15,7 @@ local.properties
 .idea/
 *.iml
 .codesight
+decompiled/
 
 # Python virtual environment
 server/venv/

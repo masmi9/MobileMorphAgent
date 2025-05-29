@@ -37,6 +37,20 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".StealthSettingsActivity" android:exported="true" />
+
+        <activity-alias
+            android:name=".SettingsAlias"
+            android:targetActivity=".StealthSettingsActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:label="Agent Settings">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"

@@ -254,14 +254,19 @@ def run_dyna():
     package_name = data.get("package_name")
     if not all([apk_path, package_name]):
         return jsonify({"status": "error", "message": "Missing apk_path or package_name"}), 400
-    try: 
+    try:
         result = subprocess.check_output(
             ["python3", "dyna.py", "--apk", apk_path, "--pkg", package_name, "--format", "html"],
             stderr=subprocess.STDOUT
         ).decode()
         return jsonify({"status": "success", "output": result})
     except subprocess.CalledProcessError as e:
-        return jsonify({"status": "error", "output": e.output.decode()})
+        return jsonify({
+            "status": "error",
+            "command": e.cmd,
+            "returncode": e.returncode,
+            "output": e.output.decode(errors="ignore")
+        }), 500
 
 # === WebSocket Event Handling ===
 @socketio.on('connect')
@@ -280,6 +285,11 @@ def register_agent(data):
     agent_sockets[device_id] = request.sid
     emit('agent_list', connected_agents, broadcast=True)
     print(f"[+] WebSocket Agent registered: {device_id}")
+
+@socketio.on("register_progress_listener")
+def handle_progress_listener(data):
+    device_id = data.get("device_id")
+    agent_sockets[device_id] = request.sid
 
 @socketio.on('command_result')
 def on_command_result(data):

