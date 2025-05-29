@@ -8,10 +8,10 @@ This roadmap outlines how to elevate MobileMorphAgent beyond the capabilities of
 
 ### ✅ Agent Improvements
 
-* [✓] Implement stealth techniques (e.g., job-scheduling, encryption at rest)
+* [] Implement stealth techniques (e.g., job-scheduling, encryption at rest)
 * [✓] Use WorkManager or JobScheduler instead of `startService` to avoid foreground alerts
 * [✓] Persist agent after reboot using `BOOT_COMPLETED` + `ForegroundService`
-* [ ] Hide launcher icon programmatically post-install
+* [✓] Hide launcher icon programmatically post-install
 * [✓] Encrypted local storage for payloads/configs
 
 ### ✅ Command and Control (C2)
@@ -20,7 +20,7 @@ This roadmap outlines how to elevate MobileMorphAgent beyond the capabilities of
 * [✓] Use HTTPS with self-signed or Let’s Encrypt certs
 * [✓] Integrate API token authentication with rotation capability
 * [✓] Provide session view in dashboard: list of active devices, timestamps, OS info
-* [ ] Implement upload/download file endpoints via base64 or multipart
+* [✓] Implement upload/download file endpoints via base64 or multipart
 
 ---
 
@@ -52,12 +52,12 @@ This roadmap outlines how to elevate MobileMorphAgent beyond the capabilities of
 
 ### ✅ Dynamic Reflection
 
-* [ ] Implement dynamic analysis hooks for Java Reflection and ClassLoader abuse
+* [✓] Implement dynamic analysis hooks for Java Reflection and ClassLoader abuse
 * [ ] Alert on usage of `loadClass`, `newInstance`, `DexClassLoader` from suspicious paths
 
 ### ✅ Frida Automation
 
-* [ ] Expose optional endpoint to send `.js` scripts to `frida-server` runtime
+* [✓] Expose optional endpoint to send `.js` scripts to `frida-server` runtime
 * [ ] Create a Frida hook manager module
 
 ---
@@ -66,12 +66,12 @@ This roadmap outlines how to elevate MobileMorphAgent beyond the capabilities of
 
 ### ✅ Live Device Panel
 
-* [ ] Show real-time connected agents with device ID, manufacturer, root status
-* [ ] Enable manual command injection and output collection per device
+* [✓] Show real-time connected agents with device ID, manufacturer, root status
+* [✓] Enable manual command injection and output collection per device
 
 ### ✅ Modules Panel
 
-* [ ] List available modules (e.g., URI traversal, shell exec, file upload)
+* [✓] List available modules (e.g., URI traversal, shell exec, file upload)
 * [ ] Send modules as on-demand payloads
 
 ### ✅ Payload Manager
@@ -85,8 +85,8 @@ This roadmap outlines how to elevate MobileMorphAgent beyond the capabilities of
 
 ### ✅ CI/CD
 
-* [ ] Add GitHub Actions or GitLab CI pipeline to auto-build and sign agent
-* [ ] Add self-updating APK delivery mechanism (polls server for updated .apk or .dex)
+* [✓] Add GitHub Actions or GitLab CI pipeline to auto-build and sign agent
+* [✓] Add self-updating APK delivery mechanism (polls server for updated .apk or .dex)
 
 ### ✅ Play Store Readiness (for PoC only)
 

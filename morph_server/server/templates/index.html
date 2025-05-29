@@ -7,33 +7,14 @@
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body {
-      background-color: #f8f9fa;
-      font-family: Arial, sans-serif; 
-      padding: 20px; 
-    }
-    .navbar {
-      background-color: #343a40;
-    }
-    .navbar-brand {
-      color: white;
-    }
-    .card {
-      margin-top: 20px;
-    }
-    .footer {
-      margin-top: 40px;
-      text-align: center;
-      color: #6c757d;
-    }
-    pre {
-      background-color: #eee;
-      padding: 10px;
-      border-radius: 5px;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      overflow-x: auto;
-    }
+    body { background-color: #f8f9fa; font-family: Arial, sans-serif; padding: 20px; }
+    .navbar { background-color: #343a40; }
+    .navbar-brand { color: white; }
+    .card { margin-top: 20px; }
+    .footer { margin-top: 40px; text-align: center; color: #6c757d; }
+    .agent-block { border: 1px solid #ccc; background: #fff; padding: 15px; margin-bottom: 10px; border-radius: 5px; }
+    input, button { padding: 5px 10px; margin-right: 10px; }
+    pre { background-color: #eee; padding: 10px; border-radius: 5px; overflow-x: auto; }
   </style>
 </head>
 <body>
@@ -44,17 +25,26 @@
   </nav>
 
   <div class="container">
+    <!-- Connected Agents -->
+    <div class="card shadow">
+      <div class="card-header bg-primary text-white">Connected Agents</div>
+      <div class="card-body">
+        <div id="agents"></div>
+      </div>
+    </div>
+
+    <!-- Send Command -->
     <div class="card shadow">
       <div class="card-header bg-primary text-white">Send Command to Agent</div>
       <div class="card-body">
         <form id="commandForm">
           <div class="mb-3">
             <label for="deviceId" class="form-label">Device ID</label>
-            <input type="text" class="form-control" id="deviceId" placeholder="e.g. a1b2c3d4e5f67890" required />
+            <input type="text" class="form-control" id="deviceId" required />
           </div>
           <div class="mb-3">
             <label for="command" class="form-label">Command</label>
-            <input type="text" class="form-control" id="command" placeholder="e.g. ls /sdcard/" required />
+            <input type="text" class="form-control" id="command" required />
           </div>
           <button type="submit" class="btn btn-success">Send Command</button>
         </form>
@@ -62,6 +52,49 @@
       </div>
     </div>
 
+    <!-- Run Dynamic Analysis -->
+    <div class="card shadow mt-4">
+      <div class="card-header bg-success text-white">Run Dynamic Scan</div>
+      <div class="card-body">
+        <form id="dynaForm">
+          <div class="mb-3">
+            <label for="apkPath" class="form-label">APK File Path</label>
+            <input type="text" class="form-control" id="apkPath" required />
+          </div>
+          <div class="mb-3">
+            <label for="packageName" class="form-label">Package Name</label>
+            <input type="text" class="form-control" id="packageName" required />
+          </div>
+          <button type="submit" class="btn btn-warning">Run Dynamic Analysis</button>
+        </form>
+        <div id="dynaOutput" class="mt-3">
+          <div id="dynaProgress" class="progress" style="display: none;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" role="progressbar" style="width: 100%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Frida Hook Loader -->
+    <div class="card shadow">
+      <div class="card-header bg-primary text-white">Frida Hook Loader</div>
+      <div class="card-body">
+        <form id="fridaForm">
+          <div class="mb-3">
+            <label for="fridaDeviceId" class="form-label">Device ID</label>
+            <input type="text" class="form-control" id="fridaDeviceId" required />
+          </div>
+          <div class="mb-3">
+            <label for="scriptName" class="form-label">Select Frida Script</label>
+            <select class="form-select" id="scriptName" required></select>
+          </div>
+          <button type="submit" class="btn btn-warning">Load Script</button>
+        </form>
+        <div id="fridaStatus" class="mt-3"></div>
+      </div>
+    </div>
+
+    <!-- Output -->
     <div class="card mt-4 shadow">
       <div class="card-header bg-dark text-white">Latest Results</div>
       <div class="card-body">
@@ -69,6 +102,7 @@
       </div>
     </div>
 
+    <!-- Footer -->
     <div class="footer">
       <p>&copy; 2025 MobileMorph Labs</p>
     </div>
@@ -76,36 +110,150 @@
 
   <script>
     const socket = io();
+    let agentCache = {};
 
     socket.on("connect", () => {
-      console.log("✓ Connected to WebSocket server");
+      console.log("[✓] Connected to server via WebSocket");
+      fetch("/list_frida_hooks")
+        .then(res => res.json())
+        .then(data => {
+          const dropdown = document.getElementById("scriptName");
+          dropdown.innerHTML = data.scripts.map(s => `<option value="${s}">${s}</option>`).join("");
+        });
     });
 
+    // Real-time agent list update
+    socket.on("agent_list", function(data) {
+      const container = document.getElementById("agents");
+      container.innerHTML = "";
+      for (const [deviceId, meta] of Object.entries(data)) {
+        const block = `
+          <div class="agent-block">
+            <h5><strong>${deviceId}</strong></h5>
+            <p>Manufacturer: ${meta.manufacturer || 'N/A'}</p>
+            <p>Model: ${meta.model || 'N/A'}</p>
+            <p>Rooted: ${meta.rooted ? 'Yes' : 'No'}</p>
+            <p>Last Seen: ${meta.last_seen || 'Unknown'}</p>
+            <form onsubmit="sendExploit(event, '${deviceId}', 'exploit_uri_traversal')">
+              <button class="btn btn-warning btn-sm" type="submit">Run URI Traversal</button>
+            </form>
+            <form onsubmit="sendExploit(event, '${deviceId}', 'exploit_sql_injection')">
+              <button class="btn btn-danger btn-sm mt-1" type="submit">Run SQL Injection</button>
+            </form>
+            <form onsubmit="sendExploit(event, '${deviceId}', 'exploit_jsinterface_enum')">
+              <button class="btn btn-info btn-sm mt-1" type="submit">JSInterface Enum</button>
+            </form>
+            <form onsubmit="sendExploit(event, '${deviceId}', 'exploit_intent_injection')">
+              <button class="btn btn-secondary btn-sm mt-1" type="submit">Intent Injection</button>
+            </form>
+            <div class="mt-2">
+              <label class="form-label fw-bold">Latest Result:</label>
+              <pre id="result-${deviceId}" class="bg-light p-2">Waiting for result...</pre>
+            </div>
+          </div>`;
+        container.innerHTML += block;
+      }
+    });
+
+    function exportAgentsJSON() {
+      const blob = new Blob([JSON.stringify(agentCache, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "connected_agents.json";
+      a.click();
+    }
+
     socket.on("command_result", (data) => {
-      const resultBox = document.getElementById("results");
-      resultBox.textContent = `[${new Date().toLocaleTimeString()}] ${data.device_id}: ${data.output}`;
+      const outputEl = document.getElementById(`result-${data.device_id}`);
+      const resultText = `[${data.device_id}] ${data.output}`;
+      if (outputEl) {
+        outputEl.textContent = resultText;
+      } else {
+        console.warn("Received result for unknown device:", data.device_id);
+      }
     });
 
     document.getElementById("commandForm").addEventListener("submit", function (e) {
       e.preventDefault();
-      const deviceId = document.getElementById("deviceId").value.trim();
-      const command = document.getElementById("command").value.trim();
+      const deviceId = document.getElementById("deviceId").value;
+      const command = document.getElementById("command").value;
+      socket.emit("send_command", { device_id: deviceId, command: command });
+      document.getElementById("responseMsg").innerHTML =
+        `<div class='alert alert-info'>Command sent to ${deviceId}</div>`;
+    });
 
-      fetch("/set_command", {
+    document.getElementById("fridaForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const deviceId = document.getElementById("fridaDeviceId").value;
+      const scriptName = document.getElementById("hookScript").value;
+      fetch("/frida_hooks", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ device_id: deviceId, command: command })
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ device_id: deviceId, script_name: scriptName })
       })
       .then(res => res.json())
       .then(data => {
-        document.getElementById("responseMsg").innerHTML =
-          `<div class='alert alert-info'>${data.status}</div>`;
-      })
-      .catch(err => {
-        document.getElementById("responseMsg").innerHTML =
-          `<div class='alert alert-danger'>Error: ${err.message}</div>`;
+        const statusEl = document.getElementById("fridaStatus");
+        if (data.status === "hook sent") {
+          statusEl.innerHTML = `<div class='alert alert-success'>Hook sent to ${deviceId}</div>`;
+        } else {
+          statusEl.innerHTML = `<div class='alert alert-danger'>${data.error}</div>`;
+        }
       });
     });
+
+    document.getElementById("dynaForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const apkPath = document.getElementById("apkPath").value;
+      const packageName = document.getElementById("packageName").value;
+      // Show progress bar
+      document.getElementById("dynaProgress").style.display = "block";
+      document.getElementById("dynaOutput").innerHTML = "";
+      fetch("/run_dyna", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apk_path: apkPath,
+          package_name: packageName
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("dynaProgress").style.display = "none"; // Hide progress bar
+        const out = data.status === "success"
+          ? `<pre>${data.output}</pre>`
+          : `<div class='alert alert-danger'>Error: ${data.output}</div>`;
+        document.getElementById("dynaOutput").innerHTML = out;
+      })
+      .catch(err => {
+        document.getElementById("dynaProgress").style.display = "none"; // Hide progress bar on error
+        document.getElementById("dynaOutput").innerHTML = `<div class='alert alert-danger'>${err}</div>`;
+      });
+    });
+
+    function sendExploit(e, deviceId, moduleName) {
+      e.preventDefault();
+      fetch(`/exploit/${moduleName}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          device_id: deviceId,
+          package: "com.example.app" // You can dynamically retrieve the correct package per device later
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(`Exploit ${moduleName} sent to ${deviceId}.`);
+      })
+      .catch(err => {
+        alert("Error sending exploit: " + err);
+      });
+    }
   </script>
 </body>
 </html>
