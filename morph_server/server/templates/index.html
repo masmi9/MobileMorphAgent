@@ -33,6 +33,53 @@
       </div>
     </div>
 
+    <!-- Run Dynamic Analysis -->
+    <div class="card shadow mt-4">
+      <div class="card-header bg-success text-white">Run Dynamic Scan</div>
+      <div class="card-body">
+        <form id="dynaForm">
+          <div class="mb-3">
+            <label for="apkPath" class="form-label">APK File Path</label>
+            <input type="text" class="form-control" id="apkPath" required />
+          </div>
+          <div class="mb-3">
+            <label for="packageName" class="form-label">Package Name</label>
+            <input type="text" class="form-control" id="packageName" required />
+          </div>
+          <button type="submit" class="btn btn-warning">Run Dynamic Analysis</button>
+        </form>
+        <!-- Spinner -->
+        <div id="dynaSpinner" class="text-center mt-3" style="display: none;">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Running...</span>
+          </div>
+          <p class="mt-2"> Dynamic scan in progress...</p>
+        </div>
+        <div id="dynaOutput" class="mt-3">
+          <div id="dynaProgress" class="progress" style="display: none;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" role="progressbar" style="width: 100%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow mt-4">
+      <div class="card-header bg-success text-white d-flex justify-content-between align-items-center"">
+        <span>Latest Dynamic Scan Result</span>
+        <button class="btn btn-outline-light btn-sm" onclick="loadLatestScan()">Refresh</button>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+            <select id="apkSelect" class="form-select" onchange="populateAPKDropdown()">
+              <option selected disabled>Choose a scanned APK</option>
+            </select>
+          </div>
+          <pre id="dynamicScanOutput" style="max-height: 400px; overflow-y: scroll; font-size: 14px; background-color: #111; color: #0f0; padding: 10px;">
+            Loading scan results...
+          </pre>
+        </div>
+    </div>
+
     <!-- Send Command -->
     <div class="card shadow">
       <div class="card-header bg-primary text-white">Send Command to Agent</div>
@@ -49,29 +96,6 @@
           <button type="submit" class="btn btn-success">Send Command</button>
         </form>
         <div id="responseMsg" class="mt-3"></div>
-      </div>
-    </div>
-
-    <!-- Run Dynamic Analysis -->
-    <div class="card shadow mt-4">
-      <div class="card-header bg-success text-white">Run Dynamic Scan</div>
-      <div class="card-body">
-        <form id="dynaForm">
-          <div class="mb-3">
-            <label for="apkPath" class="form-label">APK File Path</label>
-            <input type="text" class="form-control" id="apkPath" required />
-          </div>
-          <div class="mb-3">
-            <label for="packageName" class="form-label">Package Name</label>
-            <input type="text" class="form-control" id="packageName" required />
-          </div>
-          <button type="submit" class="btn btn-warning">Run Dynamic Analysis</button>
-        </form>
-        <div id="dynaOutput" class="mt-3">
-          <div id="dynaProgress" class="progress" style="display: none;">
-            <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" role="progressbar" style="width: 100%"></div>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -209,9 +233,11 @@
       e.preventDefault();
       const apkPath = document.getElementById("apkPath").value;
       const packageName = document.getElementById("packageName").value;
+      const spinner = document.getElementById("dynaSpinner");
+      const output = document.getElementById("dynaOutput");
       // Show progress bar
-      document.getElementById("dynaProgress").style.display = "block";
-      document.getElementById("dynaOutput").innerHTML = "";
+      spinner.style.display = "block";
+      output.innerHTML = "";
       fetch("/run_dyna", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -222,15 +248,15 @@
       })
       .then(res => res.json())
       .then(data => {
-        document.getElementById("dynaProgress").style.display = "none"; // Hide progress bar
-        const out = data.status === "success"
-          ? `<pre>${data.output}</pre>`
+        spinner.style.display = "none";
+        const resultHtml = data.status === "success"
+          ? `<pre class="bg-light p-3 border rounded">${data.output}</pre>`
           : `<div class='alert alert-danger'>Error: ${data.output}</div>`;
-        document.getElementById("dynaOutput").innerHTML = out;
+        output.innerHTML = resultHtml;
       })
       .catch(err => {
-        document.getElementById("dynaProgress").style.display = "none"; // Hide progress bar on error
-        document.getElementById("dynaOutput").innerHTML = `<div class='alert alert-danger'>${err}</div>`;
+        spinner.style.display = "none";
+        output.innerHTML = `<div class='alert alert-danger'>${err}</div>`;
       });
     });
 
@@ -254,6 +280,64 @@
         alert("Error sending exploit: " + err);
       });
     }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      fetch("/api/frida_scripts")
+        .then((res) => res.json())
+        .then((scripts) => {
+          const dropdown = document.getElementById("scriptName");
+          scripts.forEach((script) => {
+            const option = document.createElement("option");
+            option.value = script;
+            option.textContent = script;
+            dropdown.appendChild(option);
+          });
+        })
+        .catch((err) => {
+          console.error("Failed to load Frida scripts:", err);
+        });
+    });
+
+    async function populateAPKDropdown() {
+      const res = await fetch("/list_apk_scans");
+      const data = await res.json();
+      const select = document.getElementById("apkSelect");
+      select.innerHTML = "";
+      data.apks.forEach(apk => {
+        const opt = document.createElement("option");
+        opt.value = apk.result_id;
+        opt.textContent = `${apk.package_name} (${apk.timestamp})`;
+        select.appendChild(opt);
+      });
+      loadLatestScan();
+    }
+
+    async function loadLatestScan() {
+      fetch("/latest_dynamic_result")
+        .then(res => res.json())
+        .then(results => {
+          const container = document.getElementById("dynamicScanOutput");
+          if (results.length === 0) {
+            container.innerHTML = "<p>No scan results yet.</p>";
+            return;
+          }
+          container.innerHTML = "";
+          results.forEach(entry => {
+            const div = document.createElement("div");
+            div.className = "border-bottom pb-2 mb-2";
+            div.innerHTML = `
+              <strong>📦 ${entry.package}</strong><br>
+              🕒 ${entry.timestamp}<br>
+              <a href="/${entry.html}" target="_blank" class="btn btn-sm btn-success mt-1">View HTML Report</a>
+            `;
+            container.appendChild(div);
+          });
+        })
+        .catch(err => {
+          document.getElementById("dynamicScanOutput").innerHTML = `<div class="alert alert-danger">${err}</div>`;
+        });
+    }
+    document.addEventListener("DOMContentLoaded", loadLatestScan)
   </script>
 </body>
 </html>

