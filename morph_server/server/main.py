@@ -1,12 +1,12 @@
 import eventlet
 eventlet.monkey_patch()
 
-from flask import Flask, request, jsonify, abort, send_file, render_template
+from flask import Flask, request, jsonify, abort, send_file, render_template, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
-import os
+import os, json
 import re
-import json
+from datetime import datetime
 import time
 import base64
 import subprocess
@@ -129,6 +129,37 @@ def receive_result():
 def get_result(device_id):
     return jsonify({"result": result_store.get(device_id)})
 
+@app.route("/list_apk_scans")
+def list_apk_scans():
+    result_dir = "results"
+    apks = []
+    for file in os.listdir(result_dir):
+        if file.endswith(".json"):
+            with open(os.path.join(result_dir, file), "r") as f:
+                try:
+                    meta = json.load(f)
+                    result_id = file.replace(".json", "")  # You can use this as unique ID
+                    meta["result_id"] = result_id
+                    apks.append(meta)
+                except:
+                    continue
+    apks.sort(key=lambda x: x["timestamp"], reverse=True)
+    return jsonify({"apks": apks})
+
+@app.route("/latest_dynamic_result")
+def latest_dynamic_result():
+    result_dir = "results"
+    results = []
+    for file in os.listdir(result_dir):
+        if file.endswith(".json"):
+            with open(os.path.join(result_dir, file), "r") as f:
+                try:
+                    results.append(json.load(f))
+                except:
+                    continue
+    results.sort(key=lambda x: x["timestamp"], reverse=True)
+    return jsonify(results)
+
 # === Manual Output & Command Endpoint (for debugging) ===
 @app.route("/post_output", methods=["POST"])
 def post_output():
@@ -192,6 +223,14 @@ def upload():
     return jsonify({"status": "ok"})
 
 # === Frida Hooks ===
+@app.route("/api/frida_scripts", methods=["GET"])
+def list_frida_scripts():
+    hooks_dir = os.path.join(os.getcwd(), "frida_hooks")  # Adjust if nested
+    if not os.path.exists(hooks_dir):
+        return jsonify([])
+    scripts = [f for f in os.listdir(hooks_dir) if f.endswith(".js")]
+    return jsonify(scripts)
+
 @app.route("/frida_hooks", methods=["POST"])
 def push_frida_hook():
     data = request.json
@@ -265,14 +304,35 @@ def run_dyna():
     data = request.json
     apk_path = data.get("apk_path")
     package_name = data.get("package_name")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     if not all([apk_path, package_name]):
         return jsonify({"status": "error", "message": "Missing apk_path or package_name"}), 400
     try:
         result = subprocess.check_output(
-            ["python3", "dyna.py", "--apk", apk_path, "--pkg", package_name, "--format", "html"],
-            stderr=subprocess.STDOUT
-        ).decode()
-        return jsonify({"status": "success", "output": result})
+            [
+            "python3", 
+            "/home/isi_malik/repos/automated-owasp-dynamic-scan/dyna.py", 
+            "--apk", apk_path, 
+            "--pkg", package_name
+        ], stderr=subprocess.STDOUT).decode()
+        # === Save to results/ directory ===
+        result_dir = "results"
+        os.makedirs(result_dir, exist_ok=True)
+        filename_base = f"{package_name}_{timestamp}"
+        html_path = os.path.join(result_dir, f"{filename_base}.html")
+        json_path = os.path.join(result_dir, f"{filename_base}.json")
+        with open(html_path, "w") as f:
+            f.write(result)
+        # Also store metadata
+        metadata = {
+            "package": package_name,
+            "apk_path": apk_path,
+            "timestamp": timestamp,
+            "html": html_path,
+        }
+        with open(json_path, "w") as jf:
+            json.dump(metadata, jf)
+        return jsonify({"status": "success", "output": result, "meta": metadata})
     except subprocess.CalledProcessError as e:
         print(f"[ERROR] run_dyna failed: {e}", file=stderr)
         return jsonify({

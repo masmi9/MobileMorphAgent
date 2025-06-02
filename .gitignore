@@ -30,3 +30,4 @@ Thumbs.db
 # Payload outputs
 payloads/*.dex
 out/
+results/

