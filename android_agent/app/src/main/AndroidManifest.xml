@@ -1,12 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/mobilemorph_agent"
         android:label="MobileMorph Agent"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar"
@@ -17,8 +18,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="MobileMorph Agent"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+            android:label="MobileMorph Agent">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -31,7 +31,8 @@
         <!-- Background service and receivers -->
         <service
             android:name=".services.CommandService"
-            android:exported="true"/>
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice|dataSync" />
         <receiver
             android:name=".receiver.BootReceiver"
             android:enabled="true"
