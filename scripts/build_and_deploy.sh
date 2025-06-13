@@ -1,71 +1,61 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# === CONFIG ===
+### === CONFIG ===
 REPO_ROOT="$(pwd)"
-APK_DIR="$REPO_ROOT/app/build/outputs"
-SIGNED_APK_NAME="mmagent.apk"
-SIGNED_APK_PATH="$APK_DIR/apk/debug/$SIGNED_APK_NAME"
-KEYSTORE_PATH="./debug.keystore"
-KEY_ALIAS="androiddebugkey"
-KEYSTORE_PASS="android"
-KEY_PASS="android"
+APK_DIR="$REPO_ROOT/app/build/outputs/apk/release"
+AAB_DIR="$REPO_ROOT/app/build/outputs/bundle/release"
+KEYSTORE_PATH="$REPO_ROOT/keystore/mmagent.jks"
+KEY_ALIAS="mmagent"
 PACKAGE_NAME="com.mobilemorph.agent"
-BUNDLETOOL_JAR="tools/bundletool-all-1.18.1.jar"
+BUNDLETOOL_JAR="$REPO_ROOT/tools/bundletool-all-1.18.1.jar"   # optional
 
-echo "[+] Cleaning previous builds..."
+### === ENV PASSES ===
+KS_PASS="${KEYSTORE_PASS:?Set KEYSTORE_PASS in your shell}"
+KP_PASS="${KEY_PASS:?Set KEY_PASS in your shell}"
+
+### === 1. CLEAN ===
+echo "[+] Cleaning previous builds…"
 ./gradlew clean
 
-echo "[+] Assembling debug APK..."
-./gradlew assembleDebug
+### === 2. BUILD SIGNED RELEASE APK ===
+echo "[+] Assembling signed *release* APK (v2/v3/v4)…"
+./gradlew assembleRelease            # or: ./gradlew bundleRelease for an .aab
 
-# Find actual debug APK
-ACTUAL_APK=$(find "$APK_DIR/apk/debug" -name "*-debug.apk" | sort -r | head -n 1)
-
-if [ ! -f "$ACTUAL_APK" ]; then
-    echo "[!] Build failed: Could not find any debug APK in $APK_DIR/apk/debug"
-    exit 1
+### === 3. LOCATE THE APK ===
+RELEASE_APK=$(find "$APK_DIR" -name '*-release.apk' | sort -r | head -n 1)
+if [[ ! -f "$RELEASE_APK" ]]; then
+  echo "[!] Build failed: no release APK found in $APK_DIR"
+  exit 1
 fi
+echo "[✓] Found release APK: $RELEASE_APK"
 
-echo "[✓] Found debug APK: $ACTUAL_APK"
-echo "[+] Copying and renaming to $SIGNED_APK_PATH"
-cp "$ACTUAL_APK" "$SIGNED_APK_PATH"
+### === 4. VERIFY ALL SIGNATURES, INCLUDING v4 ===
+IDSIG_FILE="${RELEASE_APK}.idsig"   # Gradle creates this when v4SigningEnabled = true
+echo "[+] Verifying v2/v3/v4 signatures…"
+apksigner verify --verbose --print-certs \
+  --v4-signature-file "$IDSIG_FILE" \
+  "$RELEASE_APK"
 
-# Generate debug keystore if not exists
-if [ ! -f "$KEYSTORE_PATH" ]; then
-    echo "[+] Generating debug keystore..."
-    keytool -genkeypair -v -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASS" \
-        -alias "$KEY_ALIAS" -keypass "$KEY_PASS" -keyalg RSA -keysize 2048 -validity 10000 \
-        -dname "CN=Android Debug,O=Android,C=US"
-fi
+### === 5. (OPTIONAL) BUILD A UNIVERSAL .APKS FROM THE .AAB ===
+# If you prefer installing the AAB-based universal APK set instead of the plain APK:
+# AAB=$(find "$AAB_DIR" -name '*.aab' | sort -r | head -n 1)
+# if [[ -f "$AAB" ]]; then
+#   echo "[+] Converting AAB → universal .apks for local install…"
+#   java -jar "$BUNDLETOOL_JAR" build-apks \
+#        --bundle "$AAB" \
+#        --output mmagent.apks \
+#        --ks "$KEYSTORE_PATH" --ks-pass pass:"$KS_PASS" \
+#        --ks-key-alias "$KEY_ALIAS" --key-pass pass:"$KP_PASS" \
+#        --mode=universal
+#   RELEASE_APK="mmagent.apks"
+# fi
 
-echo "[+] Signing APK with v1, v2, and v3 signature schemes..."
-apksigner sign \
-  --ks "$KEYSTORE_PATH" \
-  --ks-key-alias "$KEY_ALIAS" \
-  --ks-pass pass:"$KEYSTORE_PASS" \
-  --key-pass pass:"$KEY_PASS" \
-  --v1-signing-enabled true \
-  --v2-signing-enabled true \
-  --v3-signing-enabled true \
-  --out "$SIGNED_APK_PATH" \
-  "$SIGNED_APK_PATH"
+### === 6. INSTALL ON CONNECTED DEVICE ===
+echo "[+] Installing on device…"
+adb install -r "$RELEASE_APK"
+echo "[✓] Install complete."
 
-echo "[+] Verifying APK signature..."
-apksigner verify --verbose --print-certs "$SIGNED_APK_PATH"
-if [ $? -ne 0 ]; then
-    echo "[!] APK signing verification failed."
-    exit 1
-fi
-
-echo "[+] Installing $SIGNED_APK_NAME on device..."
-adb install -r "$SIGNED_APK_PATH"
-if [ $? -eq 0 ]; then
-    echo "[✓] Installed $SIGNED_APK_NAME successfully!"
-else
-    echo "[!] Failed to install APK."
-    exit 1
-fi
-
-# Optional: Start agent service (uncomment if needed)
-# echo "[+] Starting CommandService..."
-# adb shell am startservice $PACKAGE_NAME/.services.CommandService
+### === 7. (OPTIONAL) START THE COMMAND SERVICE ===
+# echo "[+] Starting CommandService…"
+# adb shell am startservice "$PACKAGE_NAME"/.services.CommandService

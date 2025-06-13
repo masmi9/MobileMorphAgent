@@ -42,7 +42,7 @@
 ```plaintext
 MobileMorphAgent/
 ├── .github/workflows
-│   ├── codeql.yml
+│   └──  codeql.yml
 |
 ├── android_agent/           # Android APK (agent)
 │   ├── app/
