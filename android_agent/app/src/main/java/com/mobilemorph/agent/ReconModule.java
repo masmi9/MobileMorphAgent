@@ -1,4 +1,5 @@
 package com.mobilemorph.agent;
+import com.mobilemorph.agent.telemetry.Telemetry;
 import android.content.Context;
 import android.content.pm.*;
 import android.provider.Settings;
@@ -8,6 +9,8 @@ import org.json.JSONObject;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 
 public class ReconModule {
 

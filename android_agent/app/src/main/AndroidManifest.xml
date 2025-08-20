@@ -12,6 +12,7 @@
         android:label="MobileMorph Agent"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar"
         android:networkSecurityConfig="@xml/network_security" 
+        android:name="com.mobilemorph.agent.AgentApplication"
         xmlns:tools="http://schemas.android.com/tools">
 
         <!-- Main agent logic -->
