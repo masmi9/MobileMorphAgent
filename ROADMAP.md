@@ -8,7 +8,7 @@ This roadmap outlines how to elevate MobileMorphAgent beyond the capabilities of
 
 ### ✅ Agent Improvements
 
-* [] Implement stealth techniques (e.g., job-scheduling, encryption at rest)
+* [✓] Implement stealth techniques (e.g., job-scheduling, encryption at rest)
 * [✓] Use WorkManager or JobScheduler instead of `startService` to avoid foreground alerts
 * [✓] Persist agent after reboot using `BOOT_COMPLETED` + `ForegroundService`
 * [✓] Hide launcher icon programmatically post-install

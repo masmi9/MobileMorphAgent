@@ -99,6 +99,16 @@ def export_telemetry(device_id):
         json.dump(telemetry, f, indent=2)
     return send_file(filepath, mimetype="application/json", as_attachment=True)
 
+# === MobileMorph & MobileMorphAgent connection ===
+@app.route('/api/start_dynamic', methods=['POST'])
+def start_dynamic():
+    apk_name = request.json.get('apk_name')
+    # Log the received request
+    print(f"Received dynamic analysis request for: {apk_name}")
+    # Trigger your agent logic here (e.g., start recon, hook, etc.)
+    # You can run it in a thread or queue if needed
+    return jsonify({"status": "dynamic_analysis_started", "apk_name": apk_name}), 200
+
 # === Poll-based C2 commands ===
 @app.route("/api/send_command", methods=["POST"])
 def send_command_to_agent():

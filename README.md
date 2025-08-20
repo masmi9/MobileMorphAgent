@@ -41,16 +41,26 @@
 
 ```plaintext
 MobileMorphAgent/
+├── .github/workflows
+│   └──  codeql.yml
+|
 ├── android_agent/           # Android APK (agent)
 │   ├── app/
 │   │   ├── src/main/
 │   │   |   ├── java/
 │   │   |   |   ├── com/mobilemorph/agent/
+|   |   |   |   |   ├── AgentUpdateManager.java
 |   |   |   |   |   ├── MainActivity.java
+|   |   |   |   |   ├── ReconModule.java
+|   |   |   |   |   ├── StealthSettingsActivity.java
+|   |   |   |   |   ├── UpdateChecker.java
+│   │   |   |   |   ├── frida/           # FridaHookManager.kt
+│   │   |   |   |   ├── jobs/            # AgentWorker.java
 │   │   |   |   |   ├── services/        # CommandService.java
 │   │   |   |   |   ├── receiver/        # BootReceiver.java
-│   │   |   |   |   └── util/            # ShellExecutor.java, DexLoader.java
-│   │   |   |   ├── res/layout           # activity_main.xml (minimal)
+│   │   |   |   |   └── util/            # ShellExecutor.java, DexLoader.java, EncryptedDexLoader.java, NetworkUtils.java, PayloadUpdater.java
+│   │   |   |   ├── res/layout           # activity_main.xml, activity_stealth_settings.xml
+│   │   |   |   ├── res/xml              # network_security.xml
 |   |   |   └── AndroidManifest.xml
 |   |   └── build.gradle
 |   ├── gradle/wrapper
@@ -59,28 +69,49 @@ MobileMorphAgent/
 |   ├── gradlew.bat
 │   └── settings.gradle
 |
+├── core/                    # replacement for Drozer (DYNA integration)
+│   ├── __init__.py
+│   ├── agent_helper.py
+│   ├── analyzer.py
+│   ├── apk_ctx.py
+│   ├── drozer_helper.py
+│   ├── mobilemorph_agent.py
+│   └── report_generator.py
+|
 ├── frida_hooks/             # Optional Frida hook scripts
-│   └── bypass_ssl.js
+│   ├── bypass_ssl.js
+│   ├── dynamic_reflection.js
+│   ├── intent_injection.js
+│   └── network_logger.js
 │
 ├── injector/                # Native binary injector (C)
 │   ├── injector.c
 │   └── Makefile
 │
 ├── morph_server/server/                  # Flask-based C2 backend
-│   ├── main.py
-│   └── requirements.txt
+│   ├── injector.c
+│   |    ├── main.py
+│   |   ├── token_utils.py
+│   |   └── requirements.txt
 │
 ├── payloads/                # Runtime .dex payloads (copied to device)
 │   └── test_payload.dex
 │
 ├── payloads_source/         # Source .java files for payloads
+│   ├── Payload_AppScanner.java
+│   ├── Payload_ContentDump.java
+│   ├── Payload_FileExfil.java
 │   └── Payload.java
 │
 ├── scripts/                 # Helper build scripts
+│   ├── build_all_payloads.sh
+│   ├── build_and_deploy.sh
+│   ├── build_payload_appscanner.sh
 │   └── build_payload.sh
 │
 ├── LICENSE
 ├── README.md
+├── ROADMAP.md
 └── .gitignore
 ```
 

@@ -9,23 +9,46 @@ android {
 
     defaultConfig {
         applicationId "com.mobilemorph.agent"
-        minSdk 21
+        minSdk 26
         targetSdk 33
         versionCode 1
         versionName "1.0"
         multiDexEnabled true
     }
 
+    signingConfigs {
+        release {
+            storeFile       file("$rootDir/keystore/mmagent.jks")
+            storePassword   System.getenv("KEYSTORE_PASS")
+            keyAlias        "mmagent"
+            keyPassword     System.getenv("KEY_PASS")
+            enableV1Signing false       // turn off Janus-prone v1
+            enableV2Signing true
+            enableV3Signing true        
+            enableV4Signing true        
+        }
+    }
+
     buildTypes {
         release {
-            minifyEnabled false
+            signingConfig signingConfigs.release
+            debuggable false        // overrides any manifest value
+            manifestPlaceholders = [appDebuggable:"false"]
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(17)
+        }
     }
 
     applicationVariants.configureEach { variant ->
@@ -56,10 +79,11 @@ dependencies {
     implementation 'androidx.multidex:multidex:2.0.1'
     implementation "androidx.work:work-runtime:2.8.1"
     implementation "androidx.annotation:annotation:1.7.1"
-    implementation 'androidx.security:security-crypto:1.1.0-alpha03'
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
     implementation ('io.socket:socket.io-client:2.0.1') {
         exclude group: 'org.json', module: 'json'
     }
     implementation "androidx.core:core:1.10.1"
     implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.10"
+    implementation ("co.elastic.apm:elastic-otel-android:1.15.0")
 }
