@@ -1,0 +1,68 @@
+version: 2
+updates:
+  # 1) Gradle (Android/Kotlin/Java) in /android_agent
+  - package-ecosystem: "gradle"
+    directory: "/android_agent"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "android"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"   # e.g., chore(gradle): bump ...
+    # Optional: group noisy libs together
+    groups:
+      android-libs:
+        patterns:
+          - "*android*"
+          - "com.google.*"
+          - "androidx.*"
+    reviewers:
+      - "masmi9"         # change to your GitHub user/team
+
+  # 2) Python (pip) at repo root (add more entries if you have subdirs with their own requirements)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "python"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    # If you have additional Python manifests in subfolders, add more entries like:
+    # - package-ecosystem: "pip"
+    #   directory: "/server"
+    #   schedule:
+    #     interval: "weekly"
+
+  # 3) GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "ci"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
+  # 4) (Optional) npm/JS/TS — include if you have package.json anywhere
+  #    Change /web or / to the directory where package.json lives
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "js"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    # If your JS lives in a subfolder (e.g., /web), duplicate this block and change directory.
+
+  # 5) (Optional) Docker — include if you have a Dockerfile
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "docker"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"
