@@ -41,7 +41,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
@@ -52,7 +52,7 @@ jobs:
       # ----------------- Android / Kotlin / Java -----------------
       - name: Set up JDK 17
         if: matrix.build-mode == 'autobuild'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
             distribution: 'temurin'
             java-version: '17'
