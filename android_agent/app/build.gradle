@@ -59,9 +59,9 @@ android {
 
     configurations.all {
         resolutionStrategy {
-            force "org.jetbrains.kotlin:kotlin-stdlib:1.8.10"
-            force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.10"
-            force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.10"
+            force "org.jetbrains.kotlin:kotlin-stdlib:2.2.10"
+            force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.2.10"
+            force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.2.10"
         }
     }
 }
@@ -84,6 +84,6 @@ dependencies {
         exclude group: 'org.json', module: 'json'
     }
     implementation "androidx.core:core:1.17.0"
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.10"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:2.2.10"
     implementation ("co.elastic.apm:elastic-otel-android:1.15.0")
 }
