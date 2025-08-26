@@ -2,10 +2,16 @@
 <network-security-config>
     <!-- Allow HTTP only to the internal C2 server -->
     <domain-config cleartextTrafficPermitted="true">
+        <!-- loopback -->
         <domain includeSubdomains="false">127.0.0.1</domain>
-        <trust-anchors>
-            <certificates src="system" />
-        </trust-anchors>
+    </domain-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- device / LAN C2 for local testing -->
+        <domain includeSubdomains="false">192.168.6.198</domain>
+    </domain-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- emulator host forwarding -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
     </domain-config>
 
     <!-- All other traffic defaults to HTTPS and system certs only -->
