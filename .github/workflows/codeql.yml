@@ -63,21 +63,41 @@ jobs:
           set -e
           sudo apt-get update
           sudo apt-get install -y wget unzip
-          ANDROID_HOME=$HOME/Android/Sdk
+          export ANDROID_HOME=$HOME/Android/Sdk
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
           mkdir -p $ANDROID_HOME/cmdline-tools
           cd "$ANDROID_HOME/cmdline-tools"
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip -O cmdtools.zip
           unzip -q cmdtools.zip
           mv cmdline-tools latest
-          echo "$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/tools/bin" >> $GITHUB_PATH
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > dev/null
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
-      
+          {
+            echo "$ANDROID_HOME/platform-tools"
+            echo "$ANDROID_HOME/emulator"
+            echo "$ANDROID_HOME/cmdline-tools/latest/bin"
+            echo "$ANDROID_HOME/tools/bin" 
+          } >> "$GITHUB_PATH"
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes 2>/dev/null | $SDKM --licenses > /dev/null || true
+          yes 2>/dev/null | "$SDKM" --install \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "platform-tools" > /dev/null 
+
+      - name: Normalize Makefile (line endings/BOM)
+        if: matrix.language == 'java-kotlin' && hashFiles('injector/Makefile') != ''
+        run: |
+          set -e
+          sudo apt-get update && sudo apt-get install -y dos2unix
+          dos2unix injector/Makefile || true
+          # strip UTF-8 BOM if present
+          sed -i '1s/^\xEF\xBB\xBF//' injector/Makefile || true
+
       - name: Build C/C++ (injector) - Makefile
         if: matrix.language == 'c-cpp' && hashFiles('injector/Makefile') != ''
         run: |
           set -e
+          sudo apt-get install -y build-essential
           make -C injector -j"$(nproc)"
 
       - name: Build C/C++ (injector) - CMake
@@ -86,10 +106,8 @@ jobs:
           set -e
           sudo apt-get update
           sudo apt-get install -y build-essential cmake
-          mkdir -p injector/build
-          cd injector/build
-          cmake ..
-          make -j"$(nproc)"
+          cmake -S injector -B injector/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build injector/build -- -j"$(nproc)"
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

@@ -31,3 +31,5 @@ Thumbs.db
 payloads/*.dex
 out/
 results/
+
+bin/
