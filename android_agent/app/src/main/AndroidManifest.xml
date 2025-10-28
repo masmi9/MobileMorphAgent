@@ -34,6 +34,13 @@
             android:name=".services.CommandService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice|dataSync" />
+
+        <!-- ServerSocket service for ADB port forwarding (Drozer replacement) -->
+        <service
+            android:name=".services.ServerSocketService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice|dataSync" />
+
         <receiver
             android:name=".receiver.BootReceiver"
             android:enabled="true"
