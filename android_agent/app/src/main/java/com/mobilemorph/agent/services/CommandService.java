@@ -201,13 +201,24 @@ public class CommandService extends Service {
                     try {
                         if (args != null && args.length > 0) {
                             JSONObject cmdData = (JSONObject) args[0];
-                            String cmd = cmdData.getString("cmd");
-                            Log.d("WS", "Received command: " + cmd);
-                            String result = ShellExecutor.execute(cmd);
-                            JSONObject respPayload = new JSONObject();
-                            respPayload.put("device_id", deviceId);
-                            respPayload.put("result", result);
-                            mSocket.emit("command_result", respPayload);
+
+                            // Check if this is a module invocation or shell command
+                            String commandType = cmdData.optString("type", "shell");
+
+                            if ("module".equals(commandType)) {
+                                // Handle module invocation
+                                Log.d("WS", "Received module command");
+                                handleModuleCommand(cmdData);
+                            } else {
+                                // Handle traditional shell command
+                                String cmd = cmdData.getString("cmd");
+                                Log.d("WS", "Received shell command: " + cmd);
+                                String result = ShellExecutor.execute(cmd);
+                                JSONObject respPayload = new JSONObject();
+                                respPayload.put("device_id", deviceId);
+                                respPayload.put("result", result);
+                                mSocket.emit("command_result", respPayload);
+                            }
                         } else {
                             Log.w("WS", "Received 'command' event with invalid args");
                         }
@@ -269,6 +280,113 @@ public class CommandService extends Service {
             }
         } catch (Exception e) {
             Log.e(TAG, "registerWithServer() failed", e);
+        }
+    }
+
+    /**
+     * Handle module invocation commands from DYNA bridge.
+     *
+     * Expected JSON format:
+     * {
+     *     "type": "module",
+     *     "module": "ManifestAnalyzer",
+     *     "args": {"package": "com.example.app"}
+     * }
+     */
+    private void handleModuleCommand(JSONObject cmdData) {
+        try {
+            String moduleName = cmdData.getString("module");
+            JSONObject args = cmdData.getJSONObject("args");
+
+            Log.i(TAG, "Executing module: " + moduleName + " with args: " + args.toString());
+
+            JSONObject result = null;
+
+            // Route to appropriate module
+            switch(moduleName) {
+                case "ManifestAnalyzer":
+                    result = new com.mobilemorph.agent.modules.ManifestAnalyzer(this).analyze(args);
+                    break;
+                case "ContentProviderExploiter":
+                    result = new com.mobilemorph.agent.modules.ContentProviderExploiter(this).exploit(args);
+                    break;
+                case "IntentExploiter":
+                    result = new com.mobilemorph.agent.modules.IntentExploiter(this).exploit(args);
+                    break;
+                case "WebViewExploiter":
+                    result = new com.mobilemorph.agent.modules.WebViewExploiter(this).exploit(args);
+                    break;
+                case "IPCExploiter":
+                    result = new com.mobilemorph.agent.modules.IPCExploiter(this).exploit(args);
+                    break;
+                case "PermissionAuditor":
+                    result = new com.mobilemorph.agent.modules.PermissionAuditor(this).audit(args);
+                    break;
+                case "PackageEnumerator":
+                    result = new com.mobilemorph.agent.modules.PackageEnumerator(this).enumerate(args);
+                    break;
+                case "SystemCommandExecutor":
+                    result = new com.mobilemorph.agent.modules.SystemCommandExecutor().execute(args);
+                    break;
+                case "FridaAutomationModule":
+                    result = new com.mobilemorph.agent.modules.FridaAutomationModule(this).run(args);
+                    break;
+                case "ReflectionMonitorModule":
+                    result = new com.mobilemorph.agent.modules.ReflectionMonitorModule(this).monitor(args);
+                    break;
+                default:
+                    result = createErrorResponse("Unknown module: " + moduleName);
+                    Log.w(TAG, "Unknown module requested: " + moduleName);
+            }
+
+            // Send result back to server
+            if (result != null) {
+                JSONObject respPayload = new JSONObject();
+                respPayload.put("device_id", deviceId);
+                respPayload.put("result", result);
+                mSocket.emit("command_result", respPayload);
+                Log.i(TAG, "Module " + moduleName + " completed, result sent");
+            }
+
+        } catch (JSONException e) {
+            Log.e(TAG, "Error parsing module command", e);
+            sendErrorResult("Module command parsing error: " + e.getMessage());
+        } catch (Exception e) {
+            Log.e(TAG, "Error executing module", e);
+            sendErrorResult("Module execution error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Create a standardized error response.
+     */
+    private JSONObject createErrorResponse(String errorMessage) {
+        try {
+            JSONObject error = new JSONObject();
+            error.put("status", "error");
+            error.put("error", errorMessage);
+            error.put("data", JSONObject.NULL);
+            return error;
+        } catch (JSONException e) {
+            Log.e(TAG, "Error creating error response", e);
+            return new JSONObject();
+        }
+    }
+
+    /**
+     * Send an error result back to the server.
+     */
+    private void sendErrorResult(String errorMessage) {
+        try {
+            JSONObject result = createErrorResponse(errorMessage);
+            JSONObject respPayload = new JSONObject();
+            respPayload.put("device_id", deviceId);
+            respPayload.put("result", result);
+            if (mSocket != null) {
+                mSocket.emit("command_result", respPayload);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "sendErrorResult() failed", e);
         }
     }
 

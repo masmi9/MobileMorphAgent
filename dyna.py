@@ -40,30 +40,40 @@ except ImportError:
     ADBHelper = None
 
 try:
-    # FIXED: Import from core directory where DrozerHelper actually exists
-    from core.drozer_helper import DrozerHelper
+    # ENHANCED: Try to import MobileMorphAgentBridge first (preferred)
+    from core.mobilemorph_bridge import MobileMorphAgentBridge as DrozerHelper
+    USING_AGENT_BRIDGE = True
+    logging.info("Using MobileMorphAgentBridge for dynamic analysis")
 except ImportError:
-    # Create a mock DrozerHelper for testing
-    class DrozerHelper:
-        def __init__(self, package_name):
-            self.package_name = package_name
+    # Fallback to legacy DrozerHelper
+    try:
+        from core.drozer_helper import DrozerHelper
+        USING_AGENT_BRIDGE = False
+        logging.info("Using legacy DrozerHelper")
+    except ImportError:
+        # Create a mock DrozerHelper for testing
+        USING_AGENT_BRIDGE = False
+        logging.warning("No dynamic analysis helper available - using mock")
+        class DrozerHelper:
+            def __init__(self, package_name):
+                self.package_name = package_name
 
-        def start_drozer(self):
-            return False
+            def start_drozer(self):
+                return False
 
-        def check_connection(self):
-            return False
+            def check_connection(self):
+                return False
 
-        def get_connection_status(self):
-            return {"last_error": "Drozer not available"}
+            def get_connection_status(self):
+                return {"last_error": "Drozer not available"}
 
-        def run_command_safe(self, cmd, fallback_msg):
-            return fallback_msg
+            def run_command_safe(self, cmd, fallback_msg):
+                return fallback_msg
 
-        # ADDED: Missing run_command method that plugins are calling
-        def run_command(self, cmd):
-            """Mock run_command method for when Drozer is not available."""
-            raise Exception("Drozer not available - dynamic analysis limited")
+            # ADDED: Missing run_command method that plugins are calling
+            def run_command(self, cmd):
+                """Mock run_command method for when Drozer is not available."""
+                raise Exception("Drozer not available - dynamic analysis limited")
 
 
 try:
@@ -227,6 +237,8 @@ class OWASPTestSuiteDrozer:
         package_name: str,
         enable_parallel: bool = True,
         enable_optimized: bool = False,
+        agent_device_id: str = None,
+        agent_server_url: str = "http://127.0.0.1:5000",
     ):
         """
         Initialize the test suite with APK and package information.
@@ -236,9 +248,20 @@ class OWASPTestSuiteDrozer:
             package_name: The package name of the Android application
             enable_parallel: Enable parallel plugin execution (default: True)
             enable_optimized: Enable advanced optimized execution (default: False)
+            agent_device_id: Device ID for MobileMorphAgent connection (optional)
+            agent_server_url: Flask server URL for agent communication (default: http://127.0.0.1:5000)
         """
         self.apk_ctx = APKContext(apk_path_str=apk_path, package_name=package_name)
-        drozer_helper = DrozerHelper(self.apk_ctx.package_name)
+
+        # Initialize DrozerHelper/AgentBridge based on availability and configuration
+        if USING_AGENT_BRIDGE and agent_device_id:
+            drozer_helper = DrozerHelper(agent_device_id, self.apk_ctx.package_name, agent_server_url)
+            logging.info(f"Initialized MobileMorphAgentBridge for device {agent_device_id}")
+        else:
+            drozer_helper = DrozerHelper(self.apk_ctx.package_name)
+            if agent_device_id:
+                logging.warning("MobileMorphAgentBridge not available, falling back to legacy Drozer")
+
         self.apk_ctx.set_drozer_helper(drozer_helper)
         self.report_data: List[Tuple[str, Union[str, Text]]] = []
         self.report_generator = ReportGenerator(package_name, self.apk_ctx.scan_mode)
@@ -1274,7 +1297,69 @@ def main() -> None:
         help="Maximum number of worker threads for parallel execution (auto-detected if not specified)",
     )
 
+    # ADDED: MobileMorphAgent integration options (Phase 1 - Core Integration)
+    parser.add_argument(
+        "--agent-device",
+        type=str,
+        metavar="DEVICE_ID",
+        help="Device ID of connected MobileMorphAgent (auto-detects if not specified)",
+    )
+    parser.add_argument(
+        "--agent-server",
+        type=str,
+        default="http://127.0.0.1:5000",
+        metavar="URL",
+        help="Flask C2 server URL for agent communication (default: http://127.0.0.1:5000)",
+    )
+    parser.add_argument(
+        "--list-packages",
+        action="store_true",
+        help="List available packages on connected agent and exit",
+    )
+    parser.add_argument(
+        "--interactive-pkg",
+        "-i",
+        action="store_true",
+        help="Interactively select package from connected agent",
+    )
+
     args = parser.parse_args()
+
+    # Handle --list-packages (requires agent)
+    if args.list_packages:
+        if not args.agent_device:
+            print("[ERROR] --list-packages requires --agent-device")
+            sys.exit(1)
+
+        try:
+            from core.package_discovery import PackageDiscovery
+            discovery = PackageDiscovery(args.agent_device, args.agent_server)
+            discovery.list_packages()
+            sys.exit(0)
+        except Exception as e:
+            print(f"[ERROR] Failed to list packages: {e}")
+            sys.exit(1)
+
+    # Handle interactive package selection
+    if args.interactive_pkg:
+        if not args.agent_device:
+            print("[ERROR] --interactive-pkg requires --agent-device")
+            sys.exit(1)
+
+        try:
+            from core.package_discovery import PackageDiscovery
+            discovery = PackageDiscovery(args.agent_device, args.agent_server)
+            selected_pkg = discovery.interactive_select()
+
+            if selected_pkg:
+                args.pkg = selected_pkg
+                print(f"[INFO] Selected package: {selected_pkg}")
+            else:
+                print("[ERROR] No package selected")
+                sys.exit(1)
+        except Exception as e:
+            print(f"[ERROR] Interactive selection failed: {e}")
+            sys.exit(1)
 
     # Configure output manager based on arguments
     output_mgr = get_output_manager()
@@ -1306,13 +1391,55 @@ def main() -> None:
     elif enable_parallel:
         output_mgr.info("Parallel execution mode enabled (Phase 1 Priority 2)")
 
+    # Auto-detect device if not specified
+    device_id = args.agent_device
+    if not device_id:
+        try:
+            from core.device_auto_detect import auto_detect_device, display_device_banner
+            detected_id, device_info = auto_detect_device(args.agent_server)
+
+            if detected_id and device_info:
+                display_device_banner(device_info)
+
+                if device_info['agent_online']:
+                    device_id = detected_id
+                    output_mgr.success(f"✓ Using auto-detected device: {device_id}")
+                else:
+                    output_mgr.warning("⚠ Device detected but agent not online")
+                    output_mgr.info("Proceeding with static analysis only")
+            else:
+                output_mgr.info("No ADB device detected, running static analysis only")
+        except Exception as e:
+            output_mgr.debug(f"Auto-detection failed: {e}")
+            output_mgr.info("Running static analysis only")
+
     # Initialize and run test suite with enhanced execution options
     suite = OWASPTestSuiteDrozer(
         args.apk,
         args.pkg,
         enable_parallel=enable_parallel,
         enable_optimized=enable_optimized,
+        agent_device_id=device_id,
+        agent_server_url=args.agent_server,
     )
+
+    # Display agent connection status if configured
+    if device_id:
+        if USING_AGENT_BRIDGE and hasattr(suite.apk_ctx.drozer, 'agent_available'):
+            if suite.apk_ctx.drozer.agent_available:
+                output_mgr.status(
+                    f"✅ MobileMorphAgent connected: {device_id}",
+                    "success"
+                )
+                output_mgr.info("🚀 Real-time dynamic analysis enabled")
+            else:
+                output_mgr.warning(
+                    f"⚠️ MobileMorphAgent not available: {device_id}"
+                )
+                output_mgr.info(f"Error: {suite.apk_ctx.drozer.last_error}")
+                output_mgr.info("📊 Falling back to static analysis only")
+        else:
+            output_mgr.warning("⚠️ Agent bridge not available, using legacy Drozer")
 
     # Configure max workers if specified
     if args.max_workers and enable_parallel and suite.parallel_engine:

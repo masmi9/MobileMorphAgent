@@ -3,9 +3,10 @@ eventlet.monkey_patch()
 
 from flask import Flask, request, jsonify, abort, send_file, render_template, send_from_directory
 from flask_cors import CORS
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO, emit, join_room
 import os, json
 import re
+import threading
 from datetime import datetime
 import time
 import base64
@@ -108,6 +109,57 @@ def start_dynamic():
     # Trigger your agent logic here (e.g., start recon, hook, etc.)
     # You can run it in a thread or queue if needed
     return jsonify({"status": "dynamic_analysis_started", "apk_name": apk_name}), 200
+
+@app.route('/api/agent/module/<device_id>', methods=["POST"])
+def invoke_agent_module(device_id):
+    """
+    HTTP endpoint for module invocation.
+
+    Sends module command to agent via WebSocket and queues it for polling.
+
+    Request JSON:
+    {
+        "module": "ManifestAnalyzer",
+        "args": {"package": "com.example.app"}
+    }
+    """
+    data = request.json
+    module_name = data.get('module')
+    args = data.get("args", {})
+
+    # Check if agent is connected
+    if device_id not in connected_agents:
+        return jsonify({"error": "Agent not connected"}), 404
+
+    # Clear previous result for this device
+    if device_id in result_store:
+        del result_store[device_id]
+
+    # Get agent's WebSocket session ID
+    sid = agent_sockets.get(device_id)
+
+    if sid:
+        # Send module command via WebSocket for real-time delivery
+        print(f"[Bridge Server] Sending module {module_name} to {device_id} via WebSocket")
+        socketio.emit('command', {
+            'type': 'module',
+            'module': module_name,
+            'args': args
+        }, to=sid)
+    else:
+        # Fallback to command queue for polling-based agents
+        print(f"[Bridge Server] Queuing module {module_name} for {device_id} (no WebSocket)")
+        command_queue[device_id] = {
+            'type': 'module',
+            'module': module_name,
+            'args': args
+        }
+
+    return jsonify({
+        "status": "module_sent" if sid else "module_queued",
+        "module": module_name,
+        "device_id": device_id
+    })
 
 # === Poll-based C2 commands ===
 @app.route("/api/send_command", methods=["POST"])
@@ -235,7 +287,7 @@ def upload():
 # === Frida Hooks ===
 @app.route("/api/frida_scripts", methods=["GET"])
 def list_frida_scripts():
-    hooks_dir = os.path.join(os.getcwd(), "frida_hooks")  # Adjust if nested
+    hooks_dir = os.path.join(os.getcwd(), "frida_hooks")
     if not os.path.exists(hooks_dir):
         return jsonify([])
     scripts = [f for f in os.listdir(hooks_dir) if f.endswith(".js")]
@@ -256,6 +308,126 @@ def push_frida_hook():
         socketio.emit("load_frida_script", {"script": js_code}, to=sid)
         return jsonify({"status": "hook sent"})
     return jsonify({"error": "Agent not connected"}), 404
+
+@app.route("/api/frida/run", methods=["POST"])
+def run_frida_server_side():
+    """
+    Server-side Frida execution endpoint.
+
+    Runs a Frida script from frida_hooks/ against a target package on the
+    USB-connected device. Streams each output line to subscribed WebSocket
+    clients via 'frida_output' and stores the final result for polling.
+
+    Request JSON:
+    {
+        "device_id":      "abc123",
+        "script_name":    "dynamic_reflection.js",
+        "target_package": "com.example.app",
+        "mode":           "attach" | "spawn",   (default: attach)
+        "duration":       30                     (seconds, default: 30)
+    }
+    """
+    data           = request.json
+    device_id      = data.get("device_id")
+    script_name    = data.get("script_name")
+    target_package = data.get("target_package")
+    mode           = data.get("mode", "attach")
+    duration       = int(data.get("duration", 30))
+
+    if not all([device_id, script_name, target_package]):
+        return jsonify({"error": "device_id, script_name and target_package are required"}), 400
+
+    if not is_safe_filename(script_name):
+        return jsonify({"error": "Invalid script name"}), 400
+
+    hook_path = os.path.join("frida_hooks", script_name)
+    if not os.path.exists(hook_path):
+        return jsonify({"error": f"Script not found: {script_name}"}), 404
+
+    # Build frida CLI command
+    flag = "-f" if mode == "spawn" else "-n"
+    cmd  = ["frida", "-U", flag, target_package, "-l", hook_path, "--no-pause"]
+
+    output_lines = []
+    events       = []
+
+    def stream_frida():
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+
+            def read():
+                for line in proc.stdout:
+                    line = line.rstrip()
+                    output_lines.append(line)
+
+                    # Try to parse structured send() JSON
+                    try:
+                        wrapper = json.loads(line)
+                        if wrapper.get("type") == "send":
+                            payload = wrapper.get("payload")
+                            if isinstance(payload, str):
+                                payload = json.loads(payload)
+                            events.append(payload)
+                    except Exception:
+                        pass
+
+                    # Stream to any subscribers of this device's frida room
+                    socketio.emit("frida_output", {
+                        "device_id": device_id,
+                        "script":    script_name,
+                        "line":      line
+                    }, room=f"frida_{device_id}")
+
+            reader_thread = threading.Thread(target=read)
+            reader_thread.start()
+            reader_thread.join(timeout=duration)
+
+            if proc.poll() is None:
+                proc.terminate()
+
+        except FileNotFoundError:
+            output_lines.append("[!] frida CLI not found — install frida-tools: pip install frida-tools")
+        except Exception as e:
+            output_lines.append(f"[!] Frida error: {str(e)}")
+
+        # Store final result for polling
+        final = {
+            "status":     "success",
+            "script":     script_name,
+            "target":     target_package,
+            "line_count": len(output_lines),
+            "event_count": len(events),
+            "output":     output_lines,
+            "events":     events
+        }
+        result_store[device_id] = final
+
+        # Notify subscribers that session is complete
+        socketio.emit("frida_complete", {
+            "device_id":   device_id,
+            "script":      script_name,
+            "line_count":  len(output_lines),
+            "event_count": len(events)
+        }, room=f"frida_{device_id}")
+
+    # Run in background thread so HTTP response returns immediately
+    t = threading.Thread(target=stream_frida, daemon=True)
+    t.start()
+
+    return jsonify({
+        "status":         "started",
+        "device_id":      device_id,
+        "script":         script_name,
+        "target_package": target_package,
+        "mode":           mode,
+        "duration":       duration,
+        "poll_url":       f"/api/get_result/{device_id}"
+    })
 
 # === Track heartbeat/ping ===
 @app.route("/check_update", methods=["POST"])
@@ -375,6 +547,42 @@ def register_agent(data):
 def handle_progress_listener(data):
     device_id = data.get("device_id")
     agent_sockets[device_id] = request.sid
+
+@socketio.on("subscribe_frida")
+def subscribe_frida_stream(data):
+    """Subscribe to real-time Frida output for a specific device."""
+    device_id = data.get("device_id")
+    if device_id:
+        join_room(f"frida_{device_id}")
+        emit("subscribed", {"room": f"frida_{device_id}"})
+        print(f"[Frida] Client subscribed to frida stream for {device_id}")
+
+@socketio.on('module_request')
+def handle_module_request(data):
+    """
+    Execute agent module and return results
+    
+    Request format:
+    {
+        "device_id": "device123",
+        "module": "recon",
+        "args": {
+            "package": "com.example.app"
+        }
+    }
+    """
+    device_id = data.get('device_id')
+    module = data.get('module')
+    args = data.get('args', {})
+
+    # Send module invocation command to agent
+    emit('command', {
+        'type': 'module',
+        'module': module,
+        'args': args
+    }, room=device_id)
+    # Wait for result (with timeout)
+    # Return result to caller
 
 @socketio.on('command_result')
 def on_command_result(data):
